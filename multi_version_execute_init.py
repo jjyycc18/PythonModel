@@ -61,8 +61,8 @@ class ExecuteMultiVersionModel(Resource):
 
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel called.")  
 
-      model = multi_version_execute.load_multi_version_model(model_path,model_code,problem_thpe)
-      result = multi_version_execute.execute_multi_version_model(model, input_list)
+      model = multi_version_model_execute.load_multi_version_model(model_path,model_code,problem_thpe)
+      result = multi_version_model_execute.execute_multi_version_model(model, input_list)
       
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel completed.")
     except Exception as e:
@@ -90,7 +90,7 @@ class ExecuteMultiVersionScript(Resource):
 
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel called.")  
 
-      result_dict = multi_version_execute.execute_multi_version_script(script)
+      result_dict = multi_version_script_execute.execute_multi_version_script(script)
       result = result_dict[result_key]
       
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel completed.")
