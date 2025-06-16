@@ -5,18 +5,19 @@ import platform
 import functools
 import os
 import numpy as np
+from numpyencoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
 
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        return super().default(obj)
+# class NumpyEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, np.ndarray):
+#             return obj.tolist()
+#         if isinstance(obj, np.integer):
+#             return int(obj)
+#         if isinstance(obj, np.floating):
+#             return float(obj)
+#         return super().default(obj)
 
 python_version = platform.python_version()
 if python_version.startswith('3.7.'):
