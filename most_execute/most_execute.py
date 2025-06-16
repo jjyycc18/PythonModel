@@ -10,7 +10,7 @@ from common import pylogger, constants
 pylogger.generate_space_logger()
 logger = logging.getLogger(__name__)
 
-def all_most_apt(param_dict):
+def call_most_apt(param_dict):
     site = vm_dao.get_site_info()
     if param_dict is None:
         return None
