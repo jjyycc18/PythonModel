@@ -2,7 +2,7 @@ import traceback
 from http import HTTPStatus
 from flask import Flask, request
 from flask_restful import Resource, Api, reqparse
-from multi_version_execute import multi_version_model_execute, multi_version_scrip_execute
+from multi_version_execute import multi_version_model_execute, multi_version_script_execute
 import logging
 from common import pylogger
 from common.database import db_session_remove
@@ -22,7 +22,7 @@ def array_type(value,name):
 
 
 class ExecuteMultiVersionModel(Resource):
-  def port(self):
+  def post(self):
     try:
       parser = reqparse.RequestParser()
       parser.add_argument('MODEL_PATH')
@@ -31,10 +31,10 @@ class ExecuteMultiVersionModel(Resource):
       parser.add_argument('INPUT_LIST', type=array_type, location='json')
 
       args = parser.parse_args()
-      model_path =['MODEL_PATH']
-      model_code =['MODEL_CODE']
-      problem_type =['PROBLEM_TYPE']
-      input_list =['INPUT_LIST']
+      model_path = args['MODEL_PATH']
+      model_code = args['MODEL_CODE']
+      problem_type = args['PROBLEM_TYPE']
+      input_list = args['INPUT_LIST']
 
       if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
         client_ip = request.environ['REMOTE_ADDR']
@@ -43,7 +43,7 @@ class ExecuteMultiVersionModel(Resource):
 
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel called.")  
 
-      model = multi_version_model_execute.load_multi_version_model(model_path,model_code,problem_thpe)
+      model = multi_version_model_execute.load_multi_version_model(model_path, model_code, problem_type)
       result = multi_version_model_execute.execute_multi_version_model(model, input_list)
       
       logger.info("multi_version_execute_init.ExecuteMutiVersionModel completed.")
@@ -55,7 +55,7 @@ class ExecuteMultiVersionModel(Resource):
       return result
       
 class ExecuteMultiVersionScript(Resource):
-  def port(self):
+  def post(self):
     try:
       parser = reqparse.RequestParser()
       parser.add_argument('SCRIPT')
@@ -63,7 +63,7 @@ class ExecuteMultiVersionScript(Resource):
 
       args = parser.parse_args()
       script = args['SCRIPT']
-      result_key =args['RESULT_KEY']
+      result_key = args['RESULT_KEY']
 
       if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
         client_ip = request.environ['REMOTE_ADDR']
