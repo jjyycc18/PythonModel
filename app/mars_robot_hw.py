@@ -70,31 +70,38 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
         # 1. 전처리 작업
         root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
-        # 2. 캐시에 조회
+        # 캐시에 조회
         cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
         
-        # Redis에서 데이터 조회
+        # 2. Redis에서 데이터 조회
         robot_motion_hist_df, ttl = redis_cache.load_dataframe_from_redis(cache_key)
         if robot_motion_hist_df is None or ttl is None:
             logger.info(f"No robot motion data in cache (key={cache_key})")
             
             # 3. 캐시에 없으면 bigdata조회
             robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
-            if robot_motion_hist_df is not None and not robot_motion_hist_df.empty:
-                robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)
-                # starttime 기준으로 정렬, 인덱스 초기화
-                robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime'])
-                robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
-                redis_cache.save_dataframe_to_redis(cache_key, robot_motion_hist_df)
-            else:
+            
+            # 4. 
+            robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)
+            
+            # 5. starttime 기준으로 정렬, 인덱스 초기화
+            robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime'])
+            robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
+
+            # 6. 
+            if robot_motion_hist_df is None or robot_motion_hist_df.empty:
                 logger.error('robot_motion_hist_df is empty.')
-                return None
+                return None                
+            else:
+                # 7. 
+                redis_cache.save_dataframe_to_redis(cache_key, robot_motion_hist_df)                
         else:
             logger.info(f"Found robot motion data in cache (key={cache_key}, ttl={ttl})")
         
-        ## wafer, src, dst 로 필터
+        ## 8. wafer, src, dst 로 필터
         filtered_robot_motion_df = robot_motion_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id]
+        
         if filtered_robot_motion_df.empty:
             wafer_id_int = int(wafer_id)
             filtered_robot_motion_df = robot_motion_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id_int]
@@ -106,33 +113,27 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
             logger.error('filtered_robot_motion_df is empty.')
             return None
 
-        ## src || dst 가 VTM 이고 state 가 EXTEND, RETRACT 쌍인 경우 starttime = EXTEND // entime = RETRACT 로 가져 옴
+        ## 9. src || dst 가 VTM 이고 state 가 EXTEND, RETRACT 쌍인 경우 starttime = EXTEND // entime = RETRACT 로 가져 옴
         if (src_var == 'VTM' or dst_var == 'VTM') and 'EXTEND' in filtered_robot_motion_df['state'].tolist() and 'RETRACT' in filtered_robot_motion_df['state'].tolist():
             if time_var == 'START_TIME':
-                result_list = [start_time.to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
+                result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
             elif time_var == 'END_TIME':
-                result_list = [end_time.to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
+                result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
             elif time_var == 'PROCESS_TIME':
-                start_time_list = [start_time.to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
-                end_time_list = [end_time.to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
+                start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
+                end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
                 result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
-            else:
-                logger.error(f'Invalid time_var: {time_var}')
-                return None
 
         ## 위 케이스 아닌 경우는 src, dst 에 해당하는 time 값 전부 리스트로 리턴
         else:
             if time_var == 'START_TIME':
-                result_list = [start_time.to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
+                result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
             elif time_var == 'END_TIME':
-                result_list = [end_time.to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
+                result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
             elif time_var == 'PROCESS_TIME':
-                start_time_list = [start_time.to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
-                end_time_list = [end_time.to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
+                start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
+                end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
                 result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
-            else:
-                logger.error(f'Invalid time_var: {time_var}')
-                return None
 
         return result_list
 
@@ -149,19 +150,33 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
         
-        # Redis에서 데이터 조회
+        # 3. Redis에서 데이터 조회
         robot_motion_hist_df, ttl = redis_cache.load_dataframe_from_redis(cache_key)
+        
         if robot_motion_hist_df is None or ttl is None:
             logger.info(f"No robot motion data in cache (key={cache_key})")
-            return None
+            
+            # 4. 캐시에 없으면 bigdata조회
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)            
+            robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)            
+            robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime'])
+            robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
+            
+            if robot_motion_hist_df is None or robot_motion_hist_df.empty:
+                logger.error('robot_motion_hist_df is empty.')
+                return None                
+            else:
+                 # 6. 
+                redis_cache.save_dataframe_to_redis(cache_key, robot_motion_hist_df)
+        else:
+            logger.info(f"found robot motion data in cache (key={cache_key})")
         
-        # 3. hw검색용 정보 전처리
-        # wafer, src, dst 로 필터
+        # 7. hw검색용 정보 전처리
         filtered_df = robot_motion_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id]
+        
         if filtered_df.empty:
             wafer_id_int = int(wafer_id)
             filtered_df = robot_motion_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id_int]
-
         
         filtered_df = filtered_df[(filtered_df['srcmoduletype'] == work_var) | (filtered_df['dstmoduletype'] == work_var)].reset_index(drop=True)
         src_module_id = filtered_df[filtered_df['srcmoduletype'] == work_var].iloc[0].srcmoduleid
@@ -175,49 +190,48 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         next_state = ['LPFORWARD', 'FOUPDOOROPEN', 'MAPPING', 'FOUPDOORCLOSE', 'LPDECHUCK']
         prev_state = ['PURGE_FRONT', 'PURGE_REAR', 'LPCHUCK']
 
-        # 4. hw_motion_hist_df redis / 캐시에 조회
+        # 8. hw_motion_hist_df redis / 캐시에 조회
         hw_cache_key = f"HW_MOTION|{line_name}|{eqp_id}|{src_module_id}|{work_var}|{start_date}|{end_date}"
         hw_motion_hist_df = None
 
-        # Redis에서 데이터 조회
+        # 8-1. Redis에서 데이터 조회
         hw_motion_hist_df, ttl = redis_cache.load_dataframe_from_redis(hw_cache_key)
+        
         if hw_motion_hist_df is None or ttl is None:
             logger.info(f"No hw motion data in cache (key={hw_cache_key})")
             
-            # 5. 캐시에 없으면 bigdata조회
+            # 9. 캐시에 없으면 bigdata조회
             hw_motion_hist_df = bigdataquery_dao.get_eqp_hw_motion_history(line_name, eqp_id, src_module_id, work_var, start_date, end_date)
-            if hw_motion_hist_df is not None and not hw_motion_hist_df.empty:
-                # starttime 기준으로 정렬, 인덱스 초기화
-                hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time'])
-                hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True)
-                redis_cache.save_dataframe_to_redis(hw_cache_key, hw_motion_hist_df)
-            else:
+            
+            if hw_motion_hist_df is None or hw_motion_hist_df.empty:
                 logger.error('hw_motion_hist_df is empty.')
                 return None
+            else:
+                # 10.
+                redis_cache.save_dataframe_to_redis(hw_cache_key, hw_motion_hist_df)
+                # starttime 기준으로 정렬, 인덱스 초기화
+                hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time'])
+                hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True)                              
         else:
             logger.info(f"Found hw motion data in cache (key={hw_cache_key}, ttl={ttl})")
+            
+            # starttime 기준으로 정렬, 인덱스 초기화
+            hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time'])
+            hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True) 
         
-        # 7. hw정보 처리 결과가 있으면 return result_list
-        ## 7.1. 설정된 state 로 material_id 가 존재 하는 경우
+        # 11. hw정보 처리 결과가 있으면 return result_list
+        ## 11.1. 설정된 state 로 material_id 가 존재 하는 경우
         filtered_hw_motion_hist_df = hw_motion_hist_df[(hw_motion_hist_df['material_id'] == tkin.CARR_ID) & (hw_motion_hist_df['state'] == state_var)]
 
-        ## 7.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY)
+        ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY)
         if filtered_hw_motion_hist_df.empty:
             ## 없으면 state == READID 기준 이전 랏, 내 랏, 다음 랏 위치 찾음
             idx_list = hw_motion_hist_df[(hw_motion_hist_df['state'] == 'READID') & (hw_motion_hist_df['material_id'] != 'EMPTY')].index.tolist()
-            
-            if not idx_list:
-                logger.error('No READID state found in hw_motion_hist_df')
-                return None
-
             cur_idx = hw_motion_hist_df[(hw_motion_hist_df['state'] == 'READID') & (hw_motion_hist_df['material_id'] == tkin.CARR_ID)].index[0]
             cur_start_time = hw_motion_hist_df.iloc[cur_idx].start_time
 
-            ## 7.2_1. 현재 READID ~ 다음 READID 사이에서 검색
+            ## 11.2_1. 현재 READID ~ 다음 READID 사이에서 검색
             if state_var in next_state:
-                if cur_idx + 1 >= len(idx_list):
-                    logger.error('No next READID found')
-                    return None
                 next_idx = idx_list[idx_list.index(cur_idx) + 1]
                 next_start_time = hw_motion_hist_df.iloc[next_idx].start_time
 
@@ -225,7 +239,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
                                                              (hw_motion_hist_df['start_time'] < next_start_time) & 
                                                              (hw_motion_hist_df['state'] == state_var)]
 
-            ## 7.2_2. 이전 READID ~ 현재 READID 사이에서 검색
+            ## 11.2_2. 이전 READID ~ 현재 READID 사이에서 검색
             elif state_var in prev_state:
                 if cur_idx == 0:
                     logger.error('No previous READID found')
@@ -237,11 +251,8 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
                                                              (hw_motion_hist_df['start_time'] < cur_start_time) & 
                                                              (hw_motion_hist_df['state'] == state_var)]
 
-            ## 7.2_3. 이전 READID ~ 다음 READID 사이에서 검색
+            ## 11.2_3. 이전 READID ~ 다음 READID 사이에서 검색
             else:
-                if cur_idx == 0 or cur_idx + 1 >= len(idx_list):
-                    logger.error('No previous or next READID found')
-                    return None
                 next_idx = idx_list[idx_list.index(cur_idx) + 1]
                 next_start_time = hw_motion_hist_df.iloc[next_idx].start_time
                 prev_idx = idx_list[idx_list.index(cur_idx) - 1]
@@ -256,14 +267,14 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             logger.error('filtered_hw_motion_hist_df is empty.')
             return None
 
-        # 결과 있으면 time_var 설정대로 결과 생성
+        # 12. 결과 있으면 time_var 설정대로 결과 생성
         if time_var == 'START_TIME':
-            result_list = [start_time.to_pydatetime() for start_time in filtered_hw_motion_hist_df['start_time'].tolist()]
+            result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_hw_motion_hist_df['start_time'].tolist()]
         elif time_var == 'END_TIME':
-            result_list = [end_time.to_pydatetime() for end_time in filtered_hw_motion_hist_df['end_time'].tolist()]
+            result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_hw_motion_hist_df['end_time'].tolist()]
         elif time_var == 'PROCESS_TIME':
-            start_time_list = [start_time.to_pydatetime() for start_time in filtered_hw_motion_hist_df['start_time'].tolist()]
-            end_time_list = [end_time.to_pydatetime() for end_time in filtered_hw_motion_hist_df['end_time'].tolist()]
+            start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_hw_motion_hist_df['start_time'].tolist()]
+            end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_hw_motion_hist_df['end_time'].tolist()]
             result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
         else:
             logger.error(f'Invalid time_var: {time_var}')
@@ -278,12 +289,14 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
 if __name__ == "__main__":
     logger.info("============= MARS TEST  ===============")
 
+    ## hw_motio_history : PROCESS_TIME 선택시 정수로 나오는부분 체크바람 (robot_motio_history는 소수점 까지 잘나옴)
+
     ## ETCH CASE 2
     eqp_id = 'ETOP327'
     lot_id = 'PBD542.1'
     step_seq = 'CR125120'
     wafer_id = '08'
-
+ㅡㅁㄱ
     src_var = 'LOADLOCK'
     dst_var = 'VTM'
     time_var = 'PROCESS_TIME'
