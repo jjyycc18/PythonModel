@@ -117,20 +117,20 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
         if (src_var == 'VTM' or dst_var == 'VTM') and 'EXTEND' in filtered_robot_motion_df['state'].tolist() and 'RETRACT' in filtered_robot_motion_df['state'].tolist():
             if time_var == 'START_TIME':
                 result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
-            elif time_var == 'END_TIME':
+            if time_var == 'END_TIME':
                 result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
-            elif time_var == 'PROCESS_TIME':
+            if time_var == 'PROCESS_TIME':
                 start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
                 end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
                 result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
 
-        ## 위 케이스 아닌 경우는 src, dst 에 해당하는 time 값 전부 리스트로 리턴
+        ## 10. 위 케이스 아닌 경우는 src, dst 에 해당하는 time 값 전부 리스트로 리턴
         else:
             if time_var == 'START_TIME':
                 result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
-            elif time_var == 'END_TIME':
+            if time_var == 'END_TIME':
                 result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
-            elif time_var == 'PROCESS_TIME':
+            if time_var == 'PROCESS_TIME':
                 start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
                 end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
                 result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
@@ -241,9 +241,6 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
 
             ## 11.2_2. 이전 READID ~ 현재 READID 사이에서 검색
             elif state_var in prev_state:
-                if cur_idx == 0:
-                    logger.error('No previous READID found')
-                    return None
                 prev_idx = idx_list[idx_list.index(cur_idx) - 1]
                 prev_start_time = hw_motion_hist_df.iloc[prev_idx].start_time
 
