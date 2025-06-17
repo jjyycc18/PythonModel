@@ -60,3 +60,8 @@ delete_job = {
     "trigger_time": 8,
     "retention_period": 30
 }
+
+mp = {
+    "url": "http://localhost:8071/executeMp",
+    "timeout": 3000
+}
