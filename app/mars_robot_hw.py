@@ -122,7 +122,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
             if time_var == 'PROCESS_TIME':
                 start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime'].tolist()]
                 end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime'].tolist()]
-                result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
+                result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
 
         ## 10. 위 케이스 아닌 경우는 src, dst 에 해당하는 time 값 전부 리스트로 리턴
         else:
@@ -133,7 +133,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
             if time_var == 'PROCESS_TIME':
                 start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime'].tolist()]
                 end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime'].tolist()]
-                result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
+                result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
 
         return result_list
 
@@ -272,7 +272,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         elif time_var == 'PROCESS_TIME':
             start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_hw_motion_hist_df['start_time'].tolist()]
             end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_hw_motion_hist_df['end_time'].tolist()]
-            result_list = [(end_time - start_time).seconds for start_time, end_time in zip(start_time_list, end_time_list)]
+            result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
         else:
             logger.error(f'Invalid time_var: {time_var}')
             return None
