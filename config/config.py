@@ -4,7 +4,22 @@ multi_version_executor = {
     "PY38": "http://127.0.0.1:7003"
 }
 
+gpu_executor = {
+    "PY36": "http://127.0.0.1:8001",
+    "PY37": "http://127.0.0.1:8002",
+    "PY38": "http://127.0.0.1:8003"
+}
+
 most_executor = {"url": "http://127.0.0.1:7007"}
+
+moonshot_image = {
+    "image_api_url": "http://127.0.0.1:9001/api/image",
+    "result_api_url": "http://127.0.0.1:9001/api/result",
+    "top_result_api_url": "http://127.0.0.1:9001/api/top_result",
+    "download_path": "/tmp/moonshot_download",
+    "result_path": "/tmp/moonshot_result",
+    "delete_path": "/tmp/moonshot_old"
+}
 
 redis = {
     "host": "localhost",
