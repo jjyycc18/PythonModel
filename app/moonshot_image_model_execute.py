@@ -1,12 +1,11 @@
 import os
 import logging
-import ftplib
-import shutil
 import datetime
 from pathlib import Path
 from net.space_request_client import HttpRequestClient
 from dao import vm_dao
 from common import constants
+from common import ftp_util
 from config import config
 from multi_version_execute import multi_version_gpu_executor_client
 
@@ -150,31 +149,15 @@ def upload_result_images(ftp_upload_path, result_path, wisc_ftp_info):
     return False
   
   try:
-    # FTP 연결 정보
-    ftp_host = wisc_ftp_info.get('host')
-    ftp_user = wisc_ftp_info.get('username')
-    ftp_pass = wisc_ftp_info.get('password')
-    ftp_port = wisc_ftp_info.get('port', 21)
+    # FTP 유틸리티를 사용하여 디렉토리 업로드
+    success = ftp_util.upload_directory_with_info(wisc_ftp_info, result_path, ftp_upload_path)
     
-    if not all([ftp_host, ftp_user, ftp_pass]):
-      logger.error("FTP 연결 정보가 불완전합니다.")
-      return False
+    if success:
+      logger.info(f"결과 이미지 업로드 완료: {result_path} -> {ftp_upload_path}")
+    else:
+      logger.error(f"결과 이미지 업로드 실패: {result_path} -> {ftp_upload_path}")
     
-    # FTP 연결
-    ftp = ftplib.FTP()
-    ftp.connect(ftp_host, ftp_port)
-    ftp.login(ftp_user, ftp_pass)
-    
-    # 결과 디렉토리의 모든 파일 업로드
-    for filename in os.listdir(result_path):
-      file_path = os.path.join(result_path, filename)
-      if os.path.isfile(file_path):
-        with open(file_path, 'rb') as file:
-          ftp.storbinary(f'STOR {filename}', file)
-    
-    ftp.quit()
-    logger.info(f"결과 이미지 업로드 완료: {result_path} -> {ftp_upload_path}")
-    return True
+    return success
     
   except Exception as e:
     logger.error(f"FTP 업로드 중 오류 발생: {e}")
@@ -204,34 +187,18 @@ def download_wisc_image(image_url, image_download_path, wisc_ftp_info):
     return False
   
   try:
-    # FTP 연결 정보
-    ftp_host = wisc_ftp_info.get('host')
-    ftp_user = wisc_ftp_info.get('username')
-    ftp_pass = wisc_ftp_info.get('password')
-    ftp_port = wisc_ftp_info.get('port', 21)
-    
-    if not all([ftp_host, ftp_user, ftp_pass]):
-      logger.error("FTP 연결 정보가 불완전합니다.")
-      return False
-    
-    # FTP 연결
-    ftp = ftplib.FTP()
-    ftp.connect(ftp_host, ftp_port)
-    ftp.login(ftp_user, ftp_pass)
-    
     # 파일명 추출
     filename = os.path.basename(image_url)
     
-    # 디렉토리 생성
-    os.makedirs(os.path.dirname(image_download_path), exist_ok=True)
+    # FTP 유틸리티를 사용하여 파일 다운로드
+    success = ftp_util.download_file_with_info(wisc_ftp_info, filename, image_download_path)
     
-    # 파일 다운로드
-    with open(image_download_path, 'wb') as file:
-      ftp.retrbinary(f'RETR {filename}', file.write)
+    if success:
+      logger.info(f"이미지 다운로드 완료: {image_url} -> {image_download_path}")
+    else:
+      logger.error(f"이미지 다운로드 실패: {image_url} -> {image_download_path}")
     
-    ftp.quit()
-    logger.info(f"이미지 다운로드 완료: {image_url} -> {image_download_path}")
-    return True
+    return success
     
   except Exception as e:
     logger.error(f"이미지 다운로드 중 오류 발생: {e}")
