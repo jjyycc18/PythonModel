@@ -14,6 +14,8 @@ class FTPClient:
         self.password = password
         self.port = port
         self.ftp = None
+        self.timout = timeout
+        self.encoding = encoding
     
     def connect(self) -> bool:
         """FTP 서버에 연결합니다."""
