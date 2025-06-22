@@ -1,0 +1,87 @@
+stages:
+-  shutdown
+-  deploy
+-  start
+
+M_testserver_SHUTDOWN: #
+  stage:  shutdown
+  only:
+    -  development
+  when:  maunal
+  script:
+    - "echo '### shutdown start ###'"
+    -  kill -9 `ps aux |grep gunicorn |grep space_executor | awk '{ print $2 }"`
+    - "echo '### shutdown completed ###'"
+  tags:
+    -  testserver
+    
+  M_testserver_DEPLOY: #
+  stage:  deploy
+  only:
+    -  development
+  when:  maunal
+  script:
+    - "echo '### deploy start ###'"
+    -  today=$(date "+%y%m%d%H%M")
+    -  "zip -r ~/test/$[today}_backup.zip" ~/test/test -x \"users/test/git/*\" \"users/test/git/log\"
+    -  cp -r * ~/test/test
+    - "echo '### copy config ###'"
+    -  cp -pr ~/test/test/* ~/test/test/real   
+    - "echo '### deploy completed ###'"
+  tags:
+    -  testserver
+
+  M_testserver_START: #
+  stage:  start
+  only:
+    -  development
+  when:  maunal
+  script:
+    - "echo '### anaconda venv activate ###'"
+    -  source ~/anaconde3/etc/profile.d/conda.sh
+    -  conda activate venv37
+    -  "echo $PATH"
+    -  "echo $LD_LIBRARY_PATH"
+    -  cd ~/applications/test
+    -  gunicorn -c config/py37_gunicorn_config.py multi_version_execute_init:app > start_result 2>&1 &
+    - "echo '### py37start completed ###'"
+    -  conda activate venv38
+    -  "echo $PATH"
+    -  "echo $LD_LIBRARY_PATH"    
+    -  cd ~/applications/test
+    -  gunicorn -c config/py38_gunicorn_config.py multi_version_execute_init:app > start_result 2>&1 &
+    - "echo '### py38 start completed ###'"
+  tags:
+    -  testserver    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    

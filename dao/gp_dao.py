@@ -22,10 +22,19 @@ def gp_dao_session_decorator(func):
 
 @gp_dao_session_decorator
 def insert_vm_sm_tmp_most_raw(session, base_info_dict, input_value_list, output_value_list, site):
-  table_name = "ivm_sm_tmp_most_raw_mem"
-  insert_list =[{"tmp_seq":base_info_dict["TEM_SEQ"],"tmp_seq2":base_info_dict["TEM_SEQ2"] }]
-  QUERY = "insert into " + table_name + " (tmp_seq,tmp_seq2) values (:tmp_seq , :tmp_seq2)"
-  session.execute(text(query), insert_list)
+    if site == "MEM":
+        table_name = "ivm_sm_tmp_most_raw_mem"
+    else:
+        table_name = "ivm_sm_tmp_most_raw_mem2"
+    
+    insert_list = [{
+        "tmp_seq": base_info_dict["TMP_SEQ"],
+        "tmp_seq2": base_info_dict["TMP_SEQ2"],
+        "input_value_list": Json(input_value_list),
+        "output_value_list": Json(output_value_list)
+    }]
+    query = "insert into " + table_name + " (tmp_seq, tmp_seq2, input_value_list, output_value_list) values (:tmp_seq, :tmp_seq2, :input_value_list, :output_value_list)"
+    session.execute(text(query), insert_list)
 
 if __name__ == "__main__":
-  print('kk')
+    print('kk')
