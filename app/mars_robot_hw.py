@@ -64,6 +64,49 @@ def process_wafer_id(material_id):
         
     return material_id
 
+def apply_case3_mapping(hw_motion_hist_df, tkin, robot_motion_hist_df):
+    """
+    Case 3: 모든 state에 대해 material_id == 'EMPTY' 인 경우
+    LOT 진행 시간 정보만으로 material_id == 'EMPTY'에 대해 CARR_ID로 LABELING
+    
+    Args:
+        hw_motion_hist_df (DataFrame): HW 모션 히스토리 데이터
+        tkin: TKIN 정보
+        robot_motion_hist_df (DataFrame): 로봇 모션 히스토리 데이터
+        
+    Returns:
+        DataFrame: material_id가 CARR_ID로 매핑된 HW 모션 히스토리 데이터
+    """
+    try:
+        # 모든 material_id가 'EMPTY'인지 확인
+        if not (hw_motion_hist_df['material_id'] == 'EMPTY').all():
+            logger.info("Not all material_id are 'EMPTY', skipping Case 3 mapping")
+            return hw_motion_hist_df
+        
+        logger.info("Applying Case 3 mapping: all material_id are 'EMPTY'")
+        
+        # LOT 시작 시간 계산 (TKIN 시간 또는 ROBOT_MOTION_HISTORY 시작 중 빠른 시간 기준)
+        tkin_time = pd.to_datetime(tkin.LOT_TRANSN_TMSTP)
+        robot_start_time = pd.to_datetime(robot_motion_hist_df['starttime_rev'].min())
+        
+        # 더 빠른 시간을 LOT 시작 시간으로 사용
+        lot_start_time = min(tkin_time, robot_start_time) - pd.DateOffset(minutes=2)
+        
+        # LOT 끝 시간 계산 (ROBOT_MOTION_HISTORY의 가장 마지막 시간)
+        robot_end_time = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max())
+        lot_end_time = robot_end_time + pd.DateOffset(minutes=2)
+        
+        logger.info(f"Case 3 mapping - Lot start: {lot_start_time}, Lot end: {lot_end_time}")
+        
+        # HW 모션 히스토리 데이터에 CARR_ID 매핑 적용
+        hw_motion_hist_df_copy = hw_motion_hist_df.copy()
+        hw_motion_hist_df_copy['material_id'] = tkin.CARR_ID
+        
+        return hw_motion_hist_df_copy
+        
+    except Exception as e:
+        logger.error(f"Error in apply_case3_mapping: {str(e)}")
+        return hw_motion_hist_df
 
 def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_var):
     try:
@@ -219,6 +262,9 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time_rev'])
             hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True) 
         
+        # Case 3 매핑 적용 (모든 material_id가 'EMPTY'인 경우)
+        hw_motion_hist_df = apply_case3_mapping(hw_motion_hist_df, tkin, robot_motion_hist_df)
+        
         # 11. hw정보 처리 결과가 있으면 return result_list
         ## 11.1. 설정된 state 로 material_id 가 존재 하는 경우
         filtered_hw_motion_hist_df = hw_motion_hist_df[(hw_motion_hist_df['material_id'] == tkin.CARR_ID) & (hw_motion_hist_df['state'] == state_var)]
@@ -293,7 +339,7 @@ if __name__ == "__main__":
     lot_id = 'PBD542.1'
     step_seq = 'CR125120'
     wafer_id = '08'
-ㅡㅁㄱ
+
     src_var = 'LOADLOCK'
     dst_var = 'VTM'
     time_var = 'PROCESS_TIME'

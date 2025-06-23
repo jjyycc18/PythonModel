@@ -1,0 +1,106 @@
+name: Deploy to Test Server
+
+on:
+  workflow_dispatch:  # 수동 실행
+    inputs:
+      environment:
+        description: '배포 환경'
+        required: true
+        default: 'testserver'
+        type: choice
+        options:
+        - testserver
+        - production
+
+jobs:
+  shutdown:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/development'
+    steps:
+      - name: Shutdown existing processes
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            echo '### shutdown start ###'
+            kill -9 `ps aux | grep gunicorn | grep space_executor | awk '{ print $2 }'` || true
+            echo '### shutdown completed ###'
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: shutdown
+    if: github.ref == 'refs/heads/development'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to test server
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            echo '### deploy start ###'
+            today=$(date "+%y%m%d%H%M")
+            zip -r ~/test/${today}_backup.zip ~/test/test -x "users/test/git/*" "users/test/git/log"
+            echo '### backup completed ###'
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          source: "."
+          target: "~/test/test"
+          strip_components: 0
+
+      - name: Finalize deployment
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            echo '### copy config ###'
+            cp -pr ~/test/test/* ~/test/test/real
+            echo '### deploy completed ###'
+
+  start:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/development'
+    steps:
+      - name: Start Python 3.7 server
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            echo '### anaconda venv activate ###'
+            source ~/anaconda3/etc/profile.d/conda.sh
+            conda activate venv37
+            echo $PATH
+            echo $LD_LIBRARY_PATH
+            cd ~/applications/test
+            gunicorn -c config/py37_gunicorn_config.py multi_version_execute_init:app > start_result 2>&1 &
+            echo '### py37 start completed ###'
+
+      - name: Start Python 3.8 server
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            source ~/anaconda3/etc/profile.d/conda.sh
+            conda activate venv38
+            echo $PATH
+            echo $LD_LIBRARY_PATH
+            cd ~/applications/test
+            gunicorn -c config/py38_gunicorn_config.py multi_version_execute_init:app > start_result 2>&1 &
+            echo '### py38 start completed ###' 
