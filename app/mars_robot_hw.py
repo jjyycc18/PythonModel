@@ -9,6 +9,10 @@ import time
 
 logger = logging.getLogger(__name__)
 
+#def get_preprocessing_info() 함수의 start_date, end_date 를 
+#def apply_lot_mapping() 함수를 호출한 후 lot_start_time, lot_end_time 값으로 치환 한 후 mars_time_hw()을 다시 콜해서
+#계산하는 소스로 변경하여 mars_robot_hw_fix.py 파일로 만들어줘
+
 def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
     """
     공통 전처리 정보를 조회하는 함수
@@ -85,26 +89,14 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
         robot_start = pd.to_datetime(robot_motion_hist_df['starttime_rev'].min())
         lot_start_time = min(tkin_dt, robot_start) - pd.DateOffset(minutes=2) if tkin_dt is not None else robot_start - pd.DateOffset(minutes=2)
         lot_end_time = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max()) + pd.DateOffset(minutes=2)
-        mask = (df['start_time_rev'] >= lot_start_time) & (df['start_time_rev'] <= lot_end_time)
-        df.loc[mask, 'material_id'] = carr_id
-        return df
+        return lot_start_time, lot_end_time
 
     def _case2_labeling(df):
         # READID state에 material_id가 있는 경우만 라벨링
         readid_idx = df[(df['state'] == 'READID') & (df['material_id'] != 'EMPTY')].index
-        if len(readid_idx) == 0:
-            return df  # case2조건 X
+        lot_start_time = pd.to_datetime(df.loc[readid_idx[0], 'starttime_rev']) - pd.DateOffset(minutes=2)
         lot_end_time = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max()) + pd.DateOffset(minutes=2)
-        for i in readid_idx:
-            lot_start_time = pd.to_datetime(df.loc[i, 'starttime_rev']) + pd.DateOffset(minutes=-2)
-            mask = (
-                (df['start_time_rev'] >= lot_start_time) &
-                (df['start_time_rev'] <= lot_end_time) &
-                (df['material_id'] == 'EMPTY')
-            )
-            df.loc[mask, 'material_id'] = carr_id
-        return df
-
+        return lot_start_time, lot_end_time
     hw_motion_hist_df = hw_motion_hist_df.copy()
 
     # case3: material_id가 모두 'EMPTY'인 경우
