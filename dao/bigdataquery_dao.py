@@ -29,10 +29,10 @@ def get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date
                    'if_step_seq': step_seq,
                    'dateFrom': start_date,
                    'dateTo': end_date}
-    custom_columns = ['area', 'equipmentid', 'srcmoduleid', 'srcmoduletype', 'srcslotno', 'state', 'starttime', 'endtime', 'dstmoduleid', 'dstmoduletype', 'dstslotno', 'materialid']
+    custom_columns = ['area', 'equipmentid', 'srcmoduleid', 'srcmoduletype', 'srcslotno', 'state', 'starttime', 'endtime', 'dstmoduleid', 'dstmoduletype', 'dstslotno', 'materialid', 'starttime_rev', 'endtime_rev']
     param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
     rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
-    eqp_robot_motion_history_df = pd.read_json(rc.get_result(), dtype={'starttime': 'datetime64', 'endtime': 'datetime64'})
+    eqp_robot_motion_history_df = pd.read_json(rc.get_result(), dtype={'starttime': 'datetime64', 'endtime': 'datetime64', 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     return eqp_robot_motion_history_df
 
 @bigdataquery_decorator
@@ -44,12 +44,27 @@ def get_eqp_hw_motion_history(line_name, eqp_id, module_id, work_group, start_da
                    'work_group': work_group,
                    'dateFrom': start_date,
                    'dateTo': end_date}
-    custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id']
+    custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id', 'starttime_rev', 'endtime_rev']
     param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
     rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
-    eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64'})
+    eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64', 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     return eqp_hw_motion_history_df
-
+    
+@bigdataquery_decorator
+def get_eqp_hw_process_history(line_name, eqp_id, module_id, work_group, start_date, end_date):
+    query_param = {'table_name': 'fab.m_feb_process',
+                   'line_no': line_name,
+                   'eqp_id': eqp_id,
+                   'module_id': module_id,
+                   'work_group': work_group,
+                   'dateFrom': start_date,
+                   'dateTo': end_date}
+    custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id', 'starttime_rev', 'endtime_rev']
+    param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
+    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
+    eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
+    return eqp_hw_motion_history_df
+    
 @bigdataquery_decorator
 def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
     query_param = {'table_name': table_name,
