@@ -408,6 +408,11 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
         ## def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):에서  # filtered_hw_motion_hist_df = ...... 이부분을 완성해줘
         ## 11.2. filtered_hw_motion_hist_df이 이미 위에서 정렬된 상태이므로 칼럼명이 'moduleid'별로 첫행과 마지막행을 남기고 필터링한다
         # filtered_hw_motion_hist_df = ......
+        # 'moduleid'별로 첫 행과 마지막 행만 남기는 필터링
+        if not filtered_hw_motion_hist_df.empty:
+            first_rows = filtered_hw_motion_hist_df.groupby('moduleid', as_index=False).first()
+            last_rows = filtered_hw_motion_hist_df.groupby('moduleid', as_index=False).last()
+            filtered_hw_motion_hist_df = pd.concat([first_rows, last_rows]).drop_duplicates().reset_index(drop=True)
 
         ## 결과 없으면 None 리턴
         if filtered_hw_motion_hist_df.empty:
