@@ -69,34 +69,21 @@ def process_wafer_id(material_id):
     return material_id
 
 def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_time=None):
-    """
-    hw_motion_history LOT mapping (case2 + case3 통합)
-    - case3: material_id가 모두 'EMPTY'인 경우 → 시간 기반 라벨링
-    - case2: READID state에 material_id가 있는 경우 → READID 기준 라벨링
-
-    Args:
-        hw_motion_hist_df (pd.DataFrame): HW 모션 히스토리
-        robot_motion_hist_df (pd.DataFrame): 로봇 모션 히스토리
-        carr_id (str): 매핑할 CARR_ID
-        tkin_time (datetime, optional): TKIN 시간 (case3용)
-
-    Returns:
-        pd.DataFrame: material_id가 라벨링된 HW 모션 히스토리
-    """
     def _case3_labeling(df):
         # LOT 시작: TKIN/robot_motion 시작 중 빠른값 -2분, LOT 종료: robot_motion 마지막 endtime_rev +2분
         tkin_dt = pd.to_datetime(tkin_time) if tkin_time is not None else None
         robot_start = pd.to_datetime(robot_motion_hist_df['starttime_rev'].min())
         lot_start_time = min(tkin_dt, robot_start) - pd.DateOffset(minutes=2) if tkin_dt is not None else robot_start - pd.DateOffset(minutes=2)
         lot_end_time = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max()) + pd.DateOffset(minutes=2)
-        return lot_start_time, lot_end_time
+
+        mask = (df['starttime_rev'] >= lot_start_time) & (df['starttime_rev'] <= lot_end_time)
+        df.loc[mask, 'material_id'] = carr_id
+        return df
 
     def _case2_labeling(df):
-        # READID state에 material_id가 있는 경우만 라벨링
-        readid_idx = df[(df['state'] == 'READID') & (df['material_id'] != 'EMPTY')].index
-        lot_start_time = pd.to_datetime(df.loc[readid_idx[0], 'starttime_rev']) - pd.DateOffset(minutes=2)
-        lot_end_time = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max()) + pd.DateOffset(minutes=2)
-        return lot_start_time, lot_end_time
+        # pass
+        return df
+
     hw_motion_hist_df = hw_motion_hist_df.copy()
 
     # case3: material_id가 모두 'EMPTY'인 경우
@@ -105,7 +92,7 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
     else:
         # case2: READID state에 material_id가 있는 경우
         hw_motion_hist_df = _case2_labeling(hw_motion_hist_df)
-
+    
     return hw_motion_hist_df
     
 def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_var):
@@ -262,15 +249,19 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time_rev'])
             hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True) 
         
-        # Case 3 매핑 적용 (모든 material_id가 'EMPTY'인 경우)
+        
         # hw_motion_hist_df = apply_case3_mapping(hw_motion_hist_df, tkin, robot_motion_hist_df)
         
         # 11. hw정보 처리 결과가 있으면 return result_list
         ## 11.1. 설정된 state 로 material_id 가 존재 하는 경우
         filtered_hw_motion_hist_df = hw_motion_hist_df[(hw_motion_hist_df['material_id'] == tkin.CARR_ID) & (hw_motion_hist_df['state'] == state_var)]
 
-        ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY)
-        if filtered_hw_motion_hist_df.empty:
+        ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY) and # Case 3 매핑 적용 (모든 material_id가 'EMPTY'인 경우)
+        if filtered_hw_motion_hist_df.empty and (hw_motion_hist_df['material_id'] == 'EMPTY').all():
+            filtered_hw_motion_hist_df = apply_case3_mapping(hw_motion_hist_df, tkin, robot_motion_hist_df)
+            
+        ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY)    
+        else:
             ## 없으면 state == READID 기준 이전 랏, 내 랏, 다음 랏 위치 찾음
             idx_list = hw_motion_hist_df[(hw_motion_hist_df['state'] == 'READID') & (hw_motion_hist_df['material_id'] != 'EMPTY')].index.tolist()
             cur_idx = hw_motion_hist_df[(hw_motion_hist_df['state'] == 'READID') & (hw_motion_hist_df['material_id'] == tkin.CARR_ID)].index[0]
