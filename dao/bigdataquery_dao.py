@@ -51,12 +51,13 @@ def get_eqp_hw_motion_history(line_name, eqp_id, module_id, work_group, start_da
     return eqp_hw_motion_history_df
     
 @bigdataquery_decorator
-def get_eqp_hw_process_history(line_name, eqp_id, module_id, work_group, start_date, end_date):
-    query_param = {'table_name': 'fab.m_feb_process',
+def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
+    query_param = {'table_name': 'fab.m_fab_process',
                    'line_no': line_name,
                    'eqp_id': eqp_id,
-                   'module_id': module_id,
-                   'work_group': work_group,
+                   'if_lot_id': lot_id,
+                   'if_step_seq' : step_seq,
+                   'work_group': 'PM',
                    'dateFrom': start_date,
                    'dateTo': end_date}
     custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id', 'starttime_rev', 'endtime_rev']
