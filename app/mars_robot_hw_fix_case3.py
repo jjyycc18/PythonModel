@@ -1,4 +1,4 @@
-from dao import vm_dao, bigdataquery_dao
+ㄴ[from dao import vm_dao, bigdataquery_dao
 from app import app_common_function
 from app import redis_cache
 import logging
@@ -306,7 +306,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         if filtered_hw_motion_hist_df.empty:
             logger.error('filtered_hw_motion_hist_df is empty.')
             return None
-
+        
         # 12. 결과 있으면 time_var 설정대로 결과 생성
         if time_var == 'START_TIME':
             result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_hw_motion_hist_df['starttime_rev'].tolist()]
