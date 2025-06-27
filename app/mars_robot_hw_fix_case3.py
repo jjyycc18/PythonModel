@@ -373,19 +373,26 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.error('filtered_process_hist_df is empty.')
             return None
 
-        # 12. 결과 있으면 time_var 설정대로 결과 생성
+       # 12. 결과 있으면 time_var 설정대로 결과 생성
+        result_list = []
+        grouped = filtered_hw_motion_hist_df.groupby('moduleid')
+        
         if time_var == 'START_TIME':
-            result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_process_hist_df['starttime_rev'].tolist()]
+            # moduleid별 starttime_rev 최소값 리스트
+            result_list = [group['starttime_rev'].min().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
         elif time_var == 'END_TIME':
-            result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_process_hist_df['endtime_rev'].tolist()]
+            # moduleid별 endtime_rev 최대값 리스트
+            result_list = [group['endtime_rev'].max().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
         elif time_var == 'PROCESS_TIME':
-            start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_process_hist_df['starttime_rev'].tolist()]
-            end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_process_hist_df['endtime_rev'].tolist()]
-            result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
+            # moduleid별 (endtime_rev 최대값 - starttime_rev 최소값).total_seconds() 리스트
+            for name, group in grouped:
+                start_time = group['starttime_rev'].min().tz_localize(tz=None)
+                end_time = group['endtime_rev'].max().tz_localize(tz=None)
+                result_list.append((end_time - start_time).total_seconds())
         else:
             logger.error(f'Invalid time_var: {time_var}')
             return None
-
+        
         return result_list
 
     except Exception as e:
