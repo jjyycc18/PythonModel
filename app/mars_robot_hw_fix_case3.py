@@ -356,11 +356,11 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.info(f"found process_hist_df data in cache (key={cache_key})")
         
         # 5. hw검색용 정보 전처리
-        filtered_df = process_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id]
+        filtered_df = process_hist_df[process_hist_df['wafer_id'] == wafer_id]
         
         if filtered_df.empty:
             wafer_id_int = int(wafer_id)
-            filtered_df = process_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id_int]
+            filtered_df = process_hist_df[process_hist_df['wafer_id'] == wafer_id_int]
                 
         # 6. 'moduleid'별로 첫 행과 마지막 행만 남기는 필터링
         if not filtered_df.empty:
@@ -373,22 +373,25 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.error('filtered_process_hist_df is empty.')
             return None
 
-        # '''filtered_hw_motion_hist_df 결과가 다음과 같이 한쌍씩 나왔다  
-        # moduleid    starttime_rev    endtime_rev
-        # ------------------------------------------------------
-        # cha    2025-06-24 00:00:21.3    2025-06-24 00:00:24.4
-        # chb    2025-06-23 00:01:21.3    2025-06-23 00:02:25.4
-        # chd    2025-06-24 00:01:21.3    2025-06-23 00:03:26.4
-        # cha    2025-06-24 00:10:21.3    2025-06-24 00:10:24.4
-        # chb    2025-06-23 00:11:21.3    2025-06-23 00:12:25.4
-        # chd    2025-06-24 00:11:21.3    2025-06-23 00:13:26.4
-        # ------------------------------------------------------
-        # 여기서 
-        # 1. time_var == 'START_TIME' 이면  moduleid가 동일한 것중 ['starttime_rev']이 최소값들의 리스트 3개가 나오면 되고,
-        # 2. time_var == 'END_TIME' 이면  moduleid가 동일한 것중 ['endtime_rev']이 최대값들의 리스트 3개가 나오면 되고,
-        # 3. time_var == 'PROCESS_TIME' 이면  moduleid가 동일한 것중 (['endtime_rev']이 최대값 - ['starttime_rev']이 최소값).total_seconds() 들의 리스트 3개가 나오게 
+        # 12. 결과 있으면 time_var 설정대로 결과 생성
+        result_list = []
+        grouped = filtered_hw_motion_hist_df.groupby('moduleid')
         
-        # " # 12. 결과 있으면 time_var 설정대로 결과 생성"  line 310 줄  아래의 코드를 수정해줘 '''
+        if time_var == 'START_TIME':
+            # moduleid별 starttime_rev 최소값 리스트
+            result_list = [group['starttime_rev'].min().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
+        elif time_var == 'END_TIME':
+            # moduleid별 endtime_rev 최대값 리스트
+            result_list = [group['endtime_rev'].max().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
+        elif time_var == 'PROCESS_TIME':
+            # moduleid별 (endtime_rev 최대값 - starttime_rev 최소값).total_seconds() 리스트
+            for name, group in grouped:
+                start_time = group['starttime_rev'].min().tz_localize(tz=None)
+                end_time = group['endtime_rev'].max().tz_localize(tz=None)
+                result_list.append((end_time - start_time).total_seconds())
+        else:
+            logger.error(f'Invalid time_var: {time_var}')
+            return None
         
         return result_list
 
