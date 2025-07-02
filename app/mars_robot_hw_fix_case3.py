@@ -1,4 +1,4 @@
-ㄴ[from dao import vm_dao, bigdataquery_dao
+from dao import vm_dao, bigdataquery_dao
 from app import app_common_function
 from app import redis_cache
 import logging
@@ -65,6 +65,10 @@ def process_wafer_id(material_id):
     return material_id
 
 def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_time=None):
+    #수정사항
+    '''
+    gab = robot의 last_time - tkout_time()의 결과를 lot_start_time에 + 하는 로직을 추가해야한다
+    '''
     def _case3_labeling(df):
         # LOT 시작: TKIN/robot_motion 시작 중 빠른값 -2분, LOT 종료: robot_motion 마지막 endtime_rev +2분
         tkin_dt = pd.to_datetime(tkin_time) if tkin_time is not None else None
