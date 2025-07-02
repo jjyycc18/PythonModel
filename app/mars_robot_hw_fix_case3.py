@@ -71,7 +71,13 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
 
         robot_start = pd.to_datetime(robot_motion_hist_df['starttime_rev'].min())
         robot_end = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max())
-
+        
+        # 둘 다 tz-naive로 맞추기
+        if tkin_dt is not None and hasattr(tkin_dt, "tz_localize"):
+            tkin_dt = tkin_dt.tz_localize(None)
+        if hasattr(robot_start, "tz_localize"):
+            robot_start = robot_start.tz_localize(None)
+        
         # 기존 LOT 시작 시간 계산
         lot_start_time = min(tkin_dt, robot_start) - pd.DateOffset(minutes=2) if tkin_dt is not None else robot_start - pd.DateOffset(minutes=2)
 
