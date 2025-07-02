@@ -274,7 +274,11 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY) and # Case 3 매핑 적용 (모든 material_id가 'EMPTY'인 경우)
         if filtered_hw_motion_hist_df.empty and (hw_motion_hist_df['material_id'] == 'EMPTY').all():
             # _case3_labeling을 apply_lot_mapping의 내부에서 활용
-            filtered_hw_motion_hist_df = apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, tkin.CARR_ID, tkin.LOT_TRANSN_TMSTP)
+            hw_motion_hist_df = apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, tkin.CARR_ID, tkin.LOT_TRANSN_TMSTP)
+
+            # case3 labeling이후 다시 결과를 가져옴
+            filtered_hw_motion_hist_df = hw_motion_hist_df[(hw_motion_hist_df['material_id'] == tkin.CARR_ID) & (hw_motion_hist_df['state'] == state_var)]
+            
             
         elif filtered_hw_motion_hist_df.empty and not (hw_motion_hist_df['material_id'] == 'EMPTY').all():
             # else 이하 로직 (기존 11.2) 적용
@@ -296,7 +300,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
                                                                  (hw_motion_hist_df['state'] == state_var)]
                 except (ValueError, IndexError):
                     logger.error('No next READID found for state')
-                    return None.
+                    return None
 
             ## 11.2_2. 이전 READID ~ 현재 READID 사이에서 검색
             elif state_var in prev_state:
