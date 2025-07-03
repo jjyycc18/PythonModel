@@ -68,27 +68,30 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
     def _case3_labeling(df):
         tkin_dt = pd.to_datetime(tkin_time) if tkin_time is not None else None
         tkout_dt = pd.to_datetime(tkout_time) if tkout_time is not None else None
-
         robot_start = pd.to_datetime(robot_motion_hist_df['starttime_rev'].min())
         robot_end = pd.to_datetime(robot_motion_hist_df['endtime_rev'].max())
         
-        # 둘 다 tz-naive로 맞추기
         if tkin_dt is not None and hasattr(tkin_dt, "tz_localize"):
             tkin_dt = tkin_dt.tz_localize(None)
-        if hasattr(robot_start, "tz_localize"):
+        if tkout_dt is not None and hasattr(tkout_dt, "tz_localize"):
+            tkout_dt = tkout_dt.tz_localize(None)    
+        if robot_start is not None and hasattr(robot_start, "tz_localize"):
             robot_start = robot_start.tz_localize(None)
+        if robot_end is not None and hasattr(robot_end, "tz_localize"):
+            robot_end = robot_end.tz_localize(None)    
         
         # 기존 LOT 시작 시간 계산
-        lot_start_time = min(tkin_dt, robot_start) - pd.DateOffset(minutes=2) if tkin_dt is not None else robot_start - pd.DateOffset(minutes=2)
-
+        lot_start_time = tkin_dt
+        
         # gab 계산 및 적용
         if robot_end is not None and tkout_dt is not None:
             gab = robot_end - tkout_dt
-            lot_start_time = lot_start_time + gab
+            lot_start_time = lot_start_time + gab - pd.DateOffset(minutes=2)
 
         lot_end_time = robot_end + pd.DateOffset(minutes=2)
 
         mask = (df['starttime_rev'] >= lot_start_time) & (df['starttime_rev'] <= lot_end_time)
+        
         df.loc[mask, 'material_id'] = carr_id
         return df
 
