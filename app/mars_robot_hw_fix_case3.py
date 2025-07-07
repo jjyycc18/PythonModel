@@ -270,6 +270,10 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         if work_var == "LOADPORT":
             filtered_hw_motion_hist_df = hw_motion_hist_df[(hw_motion_hist_df['material_id'] == tkin.CARR_ID) & (hw_motion_hist_df['state'] == state_var)]
         else:
+            # 로드포트가 아닐때는
+            # hw_motion_hist_df['material_id'] 앞부분을 짤라서 'new_lot_id' 칼럼으로 만든후  인자값 lot_id와 비교하고 , state_var = 'DECHUCK' 값으로 필터링한게 최종 값이 된다. 
+
+            
             hw_motion_hist_df['wafer_id'] = hw_motion_hist_df['material_id'].apply(process_wafer_id)
             filtered_hw_motion_hist_df = hw_motion_hist_df[((hw_motion_hist_df['wafer_id'] == wafer_id) | hw_motion_hist_df['wafer_id'] == int(wafer_id))  & (hw_motion_hist_df['state'] == state_var)]
             
