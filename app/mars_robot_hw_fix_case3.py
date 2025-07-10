@@ -388,7 +388,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
         else:
             logger.info(f"found process_hist_df data in cache (key={cache_key})")
         
-        # 5. hw검색용 정보 전처리
+        # 5. hw검색용 정보 전처리 
         filtered_df = process_hist_df[process_hist_df['wafer_id'] == wafer_id]
         
         if filtered_df.empty:
