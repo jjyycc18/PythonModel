@@ -478,6 +478,7 @@ Bigdataquery를 조회한 결과를 fab_df로 받는다 그 칼럼리스트 = [e
     0. fab_df(원본)을  starttime_rev 오름차순 정렬한다
     1. fab_df을 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 필터링한다
     2. 1번결과에서 moduleid의 distinct값을 구한다 ex) moduleid_distinct = ['ch4','ch2']
+        -여기에서 반드시 starttime_rev 오름차순으로 리스트에 저장되어야한다
     3. fab_df(원본) 값에서 moduleid == moduleid_distinct[0] 로 필터링한다
     4. 3번결과에서 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 구분했을때, 그때의 첫번째행의 starttime_rev값과  ,
         그 이전행의 (materialid가 다른행) endtime_rev 값과의 시간 차이를 구해 result 리스트에 넣는다 (단위는 tz_localize(tz=None))
