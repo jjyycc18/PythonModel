@@ -409,6 +409,9 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
         # 12. 결과 있으면 time_var 설정대로 결과 생성
         result_list = []
         grouped = filtered_hw_motion_hist_df.groupby('moduleid')
+
+        # 각 그룹을 starttime_rev로 오름차순 정렬
+        groups = {name: group.sort_values(by='starttime_rev') for name, group in grouped}
         
         if time_var == 'START_TIME':
             # moduleid별 starttime_rev 최소값 리스트
