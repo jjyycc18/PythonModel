@@ -469,6 +469,17 @@ if __name__ == "__main__":
     logger.info(f"HW process result: {hw_result}") 
 
 
+##[MARS_TIME_P_IDLE]함수 신규생성해야 하는데 rule은 다음과 같다
+## 처리순서
+Bigdataquery를 조회한 결과를 fab_df로 받는다 그 칼럼리스트 = [equipmentid,moduleid,workgroup,state,starttime_rev,endtime_rev,materialid,recipename,if_step_seq,if_lot_id,if_tkin_date]이다
+    0. fab_df(원본)을  starttime_rev 오름차순 정렬한다
+    1. fab_df을 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 필터링한다
+    2. 1번결과에서 moduleid의 distinct값을 구한다 ex) moduleid_distinct = ['ch4','ch2']
+    3. fab_df(원본) 값에서 moduleid == moduleid_distinct[0] 로 필터링한다
+    4. 3번결과에서 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 구분했을때, 그때의 첫번째행의 starttime_rev값과  ,
+        그 이전행의 (materialid가 다른행) endtime_rev 값과의 시간 차이를 구해 result 리스트에 넣는다 (단위는 tz_localize(tz=None))
+    5. moduleid_distinct리스트가 1개 이상이면 3,4번을 반복문에 의해 수행하여 result리스트에 생성해서 최종 반환한다
+    6. 만약 4번 수행시 이전행이 존재하지 않는다면 -1를 result리스트에 넣는다
 
 
 
