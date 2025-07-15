@@ -434,7 +434,41 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
     except Exception as e:
         logger.exception(f"Error in process_hist_df: {str(e)}")
         return None
-        
+
+def mars_time_process(step_seq, eqp_id, lot_id, wafer_id):
+    # 1. 전처리작업
+    # 2. redis 캐시작업
+    # 3. redis 조회
+    # 5. matirial_id 알아내기
+    fab_df = bigdataquery_dao.get_eqp_p_idle_histiry((ine_name, eqp_id, lot_id, step_seq, start_date, end_date) 
+    fab_df = fab_df.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
+    fab_df.replace('',pd.NA, inplace=True)
+    fab_df = fab_df.dropna()                       
+                                                     
+    filtered_df_temp = fab_df[(fab_df['if_step_seq'] == step_seq) & (fab_df['if_lot_id'] == lot_id) & (fab_df['if_wafer_id'] == wafer_id)].reset_index(drop=True)    
+    matirial_id = filtered_df_temp['matirialid'].iloc[0]
+    
+    filtered_df = fab_df[(fab_df['matirialid'] == matirial_id) & (fab_df['if_lot_id'] == lot_id) & (fab_df['if_step_seq'] == step_seq)].reset_index(drop=True)
+    moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
+    result = []
+    for module_id in moduleid_distinct
+        fab_df_temp = fab_df[fab_df['moduleid'] = module_id].sort_values(by='starttime_rev').reset_index(drop=True)
+        match = fab_df_temp[fab_df_temp[matirialid] == matirial_id].index
+        if not match.empty:
+            i = match[0]
+            if i -1 in fab_df_temp.index:
+                start_time = fab_df_temp.loc[i, 'starttime_rev'].tz_localize(tz=None)
+                end_time = fab_df_temp.loc[i - 1, 'endtime_rev'].tz_localize(tz=None)
+                time_diff = (end_time - start_time).total_seconds()
+                result.append(time_diff)
+            else:
+                result.append(-1)
+    
+    return result   
+
+    
+
+
 if __name__ == "__main__":
     logger.info("============= MARS TEST  ===============")
 
@@ -470,22 +504,6 @@ if __name__ == "__main__":
     # test mars_time_hw_process
     hw_result = mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var)
     logger.info(f"HW process result: {hw_result}") 
-
-
-##[MARS_TIME_P_IDLE]함수 신규생성해야 하는데 rule은 다음과 같다
-## 처리순서
-Bigdataquery를 조회한 결과를 fab_df로 받는다 그 칼럼리스트 = [equipmentid,moduleid,workgroup,state,starttime_rev,endtime_rev,materialid,recipename,if_step_seq,if_lot_id,if_tkin_date]이다
-    0. fab_df(원본)을  starttime_rev 오름차순 정렬한다
-    1. fab_df을 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 필터링한다
-    2. 1번결과에서 moduleid의 distinct값을 구한다 ex) moduleid_distinct = ['ch4','ch2']
-        -여기에서 반드시 starttime_rev 오름차순으로 리스트에 저장되어야한다
-    3. fab_df(원본) 값에서 moduleid == moduleid_distinct[0] 로 필터링한다
-    4. 3번결과에서 materialid,if_step_seq,if_lot_id 로 전달받은 param값으로 구분했을때, 그때의 첫번째행의 starttime_rev값과  ,
-        그 이전행의 (materialid가 다른행) endtime_rev 값과의 시간 차이를 구해 result 리스트에 넣는다 (단위는 tz_localize(tz=None))
-    5. moduleid_distinct리스트가 1개 이상이면 3,4번을 반복문에 의해 수행하여 result리스트에 생성해서 최종 반환한다
-    6. 만약 4번 수행시 이전행이 존재하지 않는다면 -1를 result리스트에 넣는다
-
-
 
     
 
