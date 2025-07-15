@@ -435,7 +435,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
         logger.exception(f"Error in process_hist_df: {str(e)}")
         return None
 
-def mars_time_process(step_seq, eqp_id, lot_id, wafer_id):
+def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
     # 1. 전처리작업
     # 2. redis 캐시작업
     # 3. redis 조회
