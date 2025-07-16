@@ -111,7 +111,7 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
     
     return hw_motion_hist_df
 
-def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_var):
+def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_var, time_var):
     try:
         # 1. 전처리 작업
         root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
@@ -152,34 +152,31 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, time_v
             wafer_id_int = int(wafer_id)
             filtered_robot_motion_df = robot_motion_hist_df[robot_motion_hist_df['wafer_id'] == wafer_id_int]
             
-        filtered_robot_motion_df = filtered_robot_motion_df[(filtered_robot_motion_df['srcmoduletype'] == src_var) & (filtered_robot_motion_df['dstmoduletype'] == dst_var)].reset_index(drop=True)
+        filtered_robot_motion_df = filtered_robot_motion_df[(filtered_robot_motion_df['srcmoduletype'] == src_var) 
+                                                    & (filtered_robot_motion_df['dstmoduletype'] == dst_var)].reset_index(drop=True)
 
         ## 결과 없으면 None 리턴
         if filtered_robot_motion_df.empty:
             logger.error('filtered_robot_motion_df is empty.')
             return None
 
-        ## 9. src || dst 가 VTM 이고 state 가 EXTEND, RETRACT 쌍인 경우 starttime = EXTEND // entime = RETRACT 로 가져 옴
-        if (src_var == 'VTM' or dst_var == 'VTM') and 'EXTEND' in filtered_robot_motion_df['state'].tolist() and 'RETRACT' in filtered_robot_motion_df['state'].tolist():
-            if time_var == 'START_TIME':
-                result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime_rev'].tolist()]
-            if time_var == 'END_TIME':
-                result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime_rev'].tolist()]
-            if time_var == 'PROCESS_TIME':
-                start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'EXTEND']['starttime_rev'].tolist()]
-                end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df[filtered_robot_motion_df['state'] == 'RETRACT']['endtime_rev'].tolist()]
-                result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
-
-        ## 10. 위 케이스 아닌 경우는 src, dst 에 해당하는 time 값 전부 리스트로 리턴
+        ##신규로직시작
+        if state_var == 'ALL':
+            state_filtered_df = filtered_robot_motion_df
         else:
-            if time_var == 'START_TIME':
-                result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime_rev'].tolist()]
-            if time_var == 'END_TIME':
-                result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime_rev'].tolist()]
-            if time_var == 'PROCESS_TIME':
-                start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in filtered_robot_motion_df['starttime_rev'].tolist()]
-                end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in filtered_robot_motion_df['endtime_rev'].tolist()]
-                result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
+            state_filtered_df = filtered_robot_motion_df[filtered_robot_motion_df['state'] == state_var].reset_index(drop=True)
+            if state_filtered_df.empty:
+                logger.error('No data found for state: {state_var}')
+                return None
+                
+        if time_var == 'START_TIME':
+            result_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in state_filtered_df['starttime_rev'].tolist()]
+        if time_var == 'END_TIME':
+            result_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in state_filtered_df['endtime_rev'].tolist()]
+        if time_var == 'PROCESS_TIME':
+            start_time_list = [start_time.tz_localize(tz=None).to_pydatetime() for start_time in state_filtered_df['starttime_rev'].tolist()]
+            end_time_list = [end_time.tz_localize(tz=None).to_pydatetime() for end_time in state_filtered_df['endtime_rev'].tolist()]
+            result_list = [(end_time - start_time).total_seconds() for start_time, end_time in zip(start_time_list, end_time_list)]
 
         return result_list
 
@@ -436,36 +433,84 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
         return None
 
 def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
-    # 1. 전처리작업
-    # 2. redis 캐시작업
-    # 3. redis 조회
-    # 5. matirial_id 알아내기
-    fab_df = bigdataquery_dao.get_eqp_p_idle_histiry((ine_name, eqp_id, lot_id, step_seq, start_date, end_date) 
-    fab_df = fab_df.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
-    fab_df.replace('',pd.NA, inplace=True)
-    fab_df = fab_df.dropna()                       
-                                                     
-    filtered_df_temp = fab_df[(fab_df['if_step_seq'] == step_seq) & (fab_df['if_lot_id'] == lot_id) & (fab_df['if_wafer_id'] == wafer_id)].reset_index(drop=True)    
-    matirial_id = filtered_df_temp['matirialid'].iloc[0]
-    
-    filtered_df = fab_df[(fab_df['matirialid'] == matirial_id) & (fab_df['if_lot_id'] == lot_id) & (fab_df['if_step_seq'] == step_seq)].reset_index(drop=True)
-    moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
-    result = []
-    for module_id in moduleid_distinct
-        fab_df_temp = fab_df[fab_df['moduleid'] = module_id].sort_values(by='starttime_rev').reset_index(drop=True)
-        match = fab_df_temp[fab_df_temp[matirialid] == matirial_id].index
-        if not match.empty:
-            i = match[0]
-            if i -1 in fab_df_temp.index:
-                start_time = fab_df_temp.loc[i, 'starttime_rev'].tz_localize(tz=None)
-                end_time = fab_df_temp.loc[i - 1, 'endtime_rev'].tz_localize(tz=None)
-                time_diff = (end_time - start_time).total_seconds()
-                result.append(time_diff)
-            else:
-                result.append(-1)
-    
-    return result   
+    try:    
+        # 1. 전처리 작업
+        root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
+        # 2. Redis key 생성
+        cache_key = f"pp_idle|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        fab_df_origin = None
+        
+        # 3. Redis에서 데이터 조회
+        fab_df_origin, ttl = redis_cache.load_dataframe_from_redis(cache_key)
+        
+        if fab_df_origin is None or ttl is None:
+            logger.info(f"No fab_df_origin data in cache (key={cache_key})")
+            
+            # 4. 캐시에 없으면 bigdata조회
+            fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
+            fab_df_origin = fab_df_origin.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
+            fab_df_origin.replace('',pd.NA, inplace=True)
+            fab_df_origin = fabfab_df_origin_df.dropna()  
+            fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
+            fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
+            
+            if fab_df_origin is None or fab_df_origin.empty:
+                logger.error('p_idle data is empty.')
+                return None                
+            else:
+                redis_cache.save_dataframe_to_redis(cache_key, process_hist_df)
+        else:
+            logger.info(f"found p_idle data in cache (key={cache_key})")
+                                                 
+        # fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
+        # fab_df_origin = fab_df_origin.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
+        # fab_df_origin.replace('',pd.NA, inplace=True)
+        # fab_df_origin = fabfab_df_origin_df.dropna()  
+        # fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
+        # fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
+                                                 
+        fab_df = fab_df_origin.copy()
+              
+        filtered_df_temp = fab_df[(fab_df['if_step_seq'] == step_seq) 
+                        & (fab_df['if_lot_id'] == lot_id) 
+                        & ((fab_df['wafer_id'] == wafer_id) | (fab_df['wafer_id'] == int(wafer_id))) 
+                        ].reset_index(drop=True)    
+                        
+        if not filtered_df_temp.empty:                
+            matirial_id = filtered_df_temp['materialid'].iloc[0]
+        
+        filtered_df = fab_df[
+                            (fab_df['materialid'] == material_id) 
+                            & (fab_df['if_lot_id'] == lot_id) 
+                            & (fab_df['if_step_seq'] == step_seq)
+                            ].reset_index(drop=True)
+        
+        moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
+        
+        result = []
+        for module_id in moduleid_distinct
+            fab_df_temp = fab_df[fab_df['moduleid'] = module_id].sort_values(by='starttime_rev').reset_index(drop=True)
+            
+            match = fab_df_temp[(fab_df_temp[matirialid] == matirial_id)
+                                & (fab_df['if_lot_id'] == lot_id) 
+                                & (fab_df['if_step_seq'] == step_seq)].index
+            
+            if not match.empty:
+                i = match[0]
+                if i -1 in fab_df_temp.index:
+                    start_time = fab_df_temp.loc[i, 'starttime_rev'].tz_localize(tz=None)
+                    end_time = fab_df_temp.loc[i - 1, 'endtime_rev'].tz_localize(tz=None)
+                    time_diff = (end_time - start_time).total_seconds()
+                    result.append(time_diff)
+                else:
+                    result.append(-1)
+        
+        return result  
+    
+    except Exception as e:
+        logger.exception(f"Error in mars_time_p_idle: {str(e)}")
+        return None
     
 
 
