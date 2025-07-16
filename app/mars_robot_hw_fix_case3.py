@@ -384,6 +384,13 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
                 redis_cache.save_dataframe_to_redis(cache_key, process_hist_df)
         else:
             logger.info(f"found process_hist_df data in cache (key={cache_key})")
+
+        # 운영에만 존재하는 자료를 파일로 테스트
+        # process_hist_df = pd.read_csv('d:\test.txt',sep='\t')            
+        # process_hist_df['wafer_id'] = process_hist_df['materialid'].apply(process_wafer_id)            
+        # process_hist_df = process_hist_df.sort_values(by=['starttime_rev'])
+        # process_hist_df = process_hist_df.reset_index(drop=True)
+        
         
         # 5. hw검색용 정보 전처리 
         filtered_df = process_hist_df[process_hist_df['wafer_id'] == wafer_id]
@@ -404,21 +411,25 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             return None
 
         # 12. 결과 있으면 time_var 설정대로 결과 생성
-        result_list = []
-        grouped = filtered_hw_motion_hist_df.groupby('moduleid')
+        
+        grouped = filtered_process_hist_df.groupby('moduleid')
 
         # 각 그룹을 starttime_rev로 오름차순 정렬
         groups = {name: group.sort_values(by='starttime_rev') for name, group in grouped}
-        
+
+        #각 그룹별 starttime_rev로 초소값을 기준으로 재정렬
+        sorted_group_items = sorted(groups.items(), key=lamdba item: item[1]['starttime_rev'].min())
+
+        result_list = []
         if time_var == 'START_TIME':
             # moduleid별 starttime_rev 최소값 리스트
-            result_list = [group['starttime_rev'].min().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
+            result_list = [group['starttime_rev'].min().tz_localize(tz=None).to_pydatetime() for name, group in sorted_group_items]
         elif time_var == 'END_TIME':
             # moduleid별 endtime_rev 최대값 리스트
-            result_list = [group['endtime_rev'].max().tz_localize(tz=None).to_pydatetime() for name, group in grouped]
+            result_list = [group['endtime_rev'].max().tz_localize(tz=None).to_pydatetime() for name, group in sorted_group_items]
         elif time_var == 'PROCESS_TIME':
             # moduleid별 (endtime_rev 최대값 - starttime_rev 최소값).total_seconds() 리스트
-            for name, group in grouped:
+            for name, group in sorted_group_items:
                 start_time = group['starttime_rev'].min().tz_localize(tz=None)
                 end_time = group['endtime_rev'].max().tz_localize(tz=None)
                 result_list.append((end_time - start_time).total_seconds())
@@ -449,9 +460,9 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             
             # 4. 캐시에 없으면 bigdata조회
             fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
-            fab_df_origin = fab_df_origin.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
+            fab_df_origin = fab_df_origin.dropna(subset['if_lot_id','if_step_seq']).reset_index(drop=True)    
             fab_df_origin.replace('',pd.NA, inplace=True)
-            fab_df_origin = fabfab_df_origin_df.dropna()  
+            fab_df_origin = fab_df_origin_df.dropna()  
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
             
@@ -459,16 +470,9 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 logger.error('p_idle data is empty.')
                 return None                
             else:
-                redis_cache.save_dataframe_to_redis(cache_key, process_hist_df)
+                redis_cache.save_dataframe_to_redis(cache_key, fab_df_origin)
         else:
             logger.info(f"found p_idle data in cache (key={cache_key})")
-                                                 
-        # fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
-        # fab_df_origin = fab_df_origin.dropna(subset['if_step_seq','if_lot_id]).reset_index(drop=True)    
-        # fab_df_origin.replace('',pd.NA, inplace=True)
-        # fab_df_origin = fabfab_df_origin_df.dropna()  
-        # fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
-        # fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
                                                  
         fab_df = fab_df_origin.copy()
               
@@ -478,12 +482,12 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                         ].reset_index(drop=True)    
                         
         if not filtered_df_temp.empty:                
-            matirial_id = filtered_df_temp['materialid'].iloc[0]
+            material_id = filtered_df_temp['materialid'].iloc[0]
         
         filtered_df = fab_df[
                             (fab_df['materialid'] == material_id) 
-                            & (fab_df['if_lot_id'] == lot_id) 
-                            & (fab_df['if_step_seq'] == step_seq)
+                            & (fab_df['if_step_seq'] == step_seq) 
+                            & (fab_df['if_lot_id'] == lot_id)
                             ].reset_index(drop=True)
         
         moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
@@ -492,9 +496,9 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
         for module_id in moduleid_distinct
             fab_df_temp = fab_df[fab_df['moduleid'] = module_id].sort_values(by='starttime_rev').reset_index(drop=True)
             
-            match = fab_df_temp[(fab_df_temp[matirialid] == matirial_id)
-                                & (fab_df['if_lot_id'] == lot_id) 
-                                & (fab_df['if_step_seq'] == step_seq)].index
+            match = fab_df_temp[(fab_df_temp[materialid] == material_id)
+                                & (fab_df['if_step_seq'] == step_seq) 
+                                & (fab_df['if_lot_id'] == lot_id)].index
             
             if not match.empty:
                 i = match[0]
