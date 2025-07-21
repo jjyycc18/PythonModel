@@ -242,4 +242,129 @@ def generate_pre_defined_param_value(pre_defined_param, pre_defined_parameter_ar
         pmix_lot_tkout_info = vm_dao.get_lot_tkout_info(pmix_lot_info.LOT_ID, pmix_lot_info.STEP_SEQ, pmix_lot_info.EQP_ID)
         pmix_idle_time = cur_lot_tkin_info.LOT_TRANSN_TMSTP - pmix_lot_tkout_info.LOT_TRANSN_TMSTP
         return pmix_idle_time.total_seconds()
+        
+def execute_space_virtual_ouput_sensor(tmp_seq, virtual_sensor_script_list, output_param_list, gan_site_result, input_param_list, vm_input_data_list, pre_defined_parameter_args):
+    virtual_sensor_result_list = []
+    result_key = 'space_virtual_output_result'
+    for virtual_sensor in virtual_sensor_script_list :
+        virtual_output_name = '[' + virtual_sensor.OUTPUT_NAME + ']'
+        try:
+            script = virtual_sensor.SCRIPT
+            script = import_string + generate_script(input_param_list=input_param_list,
+                                                     input_data_list=vm_input_data_list,
+                                                     output_param_list=output_param_list,
+                                                     output_data_list=gan_site_result,
+                                                     virtual_output_name=virtual_output_name,
+                                                     script=script,
+                                                     pre_defined_parameter_args=pre_defined_parameter_args,
+                                                     result_name=result_key)
+            param_dict = { "SCRIPT": script, "RESULT_KEY": result_key}
+            enviroment = vm.dao.get_vm_space_model_tmp_info(tmp_seq).ENVIROMENT
+            multi_version_url = app_common_function.get_multi_version_url(enviroment)
+            rc = HttpRequestClient(multi_version_url + '/executeMultiVersionScript', param_dict)
+            result_dict = rc.get_result()
+            result = result_dict[result_key]
+            virtual_sensor_result_list.append(result)
+        except Exception as e:
+            logger.error(f"Error execute_space_virtual_ouput_sensorr: {str(e)}")
+            virtual_sensor_result_list.append(None)
+        finally:
+            if 'space_virtual_output_result' in globals().key():
+                del globals()['space_virtual_output_result']
+                
+    logger.info('execute_space_virtual_ouput_sensor completed !!')
+    return virtual_sensor_result_list    
+
+def execute_space_tmp_input_virtual_sensor(tmp_seq, script, input_list, input_param_list, input_data_list, pre_defined_parameter_args):
+    logger.info('execute_space_tmp_input_virtual_sensor called !!')
+    virtual_output_name = '[' + input_param.DCOLL_ITEM + ']'
+    virtual_sensor_result.DCOLL_ITEM = input_param.DCOLL_ITEM
+    virtual_sensor_result.INPUT_GROUP = input_param.INPUT_GROUP
+    virtual_sensor_result.ORDER_NO = input_param.ORDER_NO
+    result_key = 'space_virtual_input_result'
+    try:
+        script = import_string + generate_script(input_param_list=input_param_list,
+                                                     input_data_list=vm_input_data_list,
+                                                     virtual_output_name=virtual_output_name,
+                                                     script=script,
+                                                     pre_defined_parameter_args=pre_defined_parameter_args,
+                                                     result_name=result_key)
+        param_dict = { "SCRIPT": script, "RESULT_KEY": result_key}
+
+        enviroment = vm.dao.get_vm_space_model_tmp_info(tmp_seq).ENVIROMENT
+        multi_version_url = app_common_function.get_multi_version_url(enviroment)
+        rc = HttpRequestClient(multi_version_url + '/executeMultiVersionScript', param_dict)
+        result_dict = rc.get_result()
+        result = result_dict[result_key]
+        virtual_sensor_result.DCOLL_VALUE = result
+
+    except Exception as e:
+        logger.error(f"Error execute_space_tmp_input_virtual_sensor: {str(e)}")
+        virtual_sensor_result.DCOLL_VALUE = None
+    finally:
+        if 'space_virtual_input_result' in globals().key():
+                del globals()['space_virtual_input_result']
+                
+    logger.info('execute_space_tmp_input_virtual_sensor completed !!')
+    return   virtual_sensor_result
+            
+def execute_space_virtual_model(tmp_seq, tmp_model, input_norm_list, input_param_list, pre_defined_parameter_args):
+    logger.info('execute_space_virtual_model called !!')
+    
+    virtual_output_name = '[' + result_key + ']'
+    virtual_model_output = []
+    result_key = 'space_virtual_model_result'
+    
+    try:
+        script = import_string + generate_script(input_param_list=input_param_list,
+                                                     input_data_list=vm_input_norm_list,
+                                                     virtual_output_name=virtual_output_name,
+                                                     script=tmp_model.SCRIPT,
+                                                     pre_defined_parameter_args=pre_defined_parameter_args,
+                                                     result_name=result_key)
+        param_dict = { "SCRIPT": script, "RESULT_KEY": result_key}
+
+        enviroment = vm.dao.get_vm_space_model_tmp_info(tmp_seq).ENVIROMENT
+        multi_version_url = app_common_function.get_multi_version_url(enviroment)
+        rc = HttpRequestClient(multi_version_url + '/executeMultiVersionScript', param_dict)
+        result_dict = rc.get_result()
+        result = result_dict[result_key]
+        virtual_model_output.append(result)
+
+    except Exception as e:
+        logger.error(f"Error execute_space_virtual_model: {str(e)}")
+        return = [None]
+    finally:
+        if 'space_virtual_model_result' in globals().key():
+            del globals()['space_virtual_model_result']
+                
+    logger.info('execute_space_virtual_model completed !!')
+    return result   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
