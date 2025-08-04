@@ -67,7 +67,7 @@ def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, 
     return eqp_hw_motion_history_df
 
 @bigdataquery_decorator
-def get_eqp_hw_p_idle_s_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
+def get_eqp_hw_p_idle_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
     
     if line_name.startswith('P'):
         line_name = 'P'
@@ -88,6 +88,43 @@ def get_eqp_hw_p_idle_s_history(line_name, eqp_id, lot_id, step_seq, start_date,
     eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     
     return eqp_hw_motion_history_df
+
+@bigdataquery_decorator
+def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
+    
+    query_param = {'table_name': 'fab.m_fab_process',
+                   'equipmentid': eqp_id,
+                   'if_step_seq':step_seq,
+                   'if_lot_id': lot_id,
+                   'dateFrom': start_date,
+                   'dateTo': end_date,
+                   'like_conditions' : {'targetline' : f"%{line_name}%" }
+                  }
+    custom_columns = [ 'area', 'equipmentid', 'moduleid', 'workgroup', 'state', 'starttime', 'endtime', 'starttime_rev', 'endtime_rev', 'materialid', 'recipename', 'stepno', 'stepname',
+                      'if_step_seq', 'if_lot_id', 'if_tkin_date' ]
+    
+    param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
+    
+    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
+   hw_process_hist_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
+    
+    return hw_process_hist_df
+
+'''
+bigdataquery api 로그에 get_eqp_hw_process_history() 테이블조회시 아래와 같이 동일 조건으로 반복조회 하는 경우가 많이보인다.
+get_eqp_robot_motion_history(),get_eqp_hw_motion_history() 은 반복조회되지 않는다, 혹시 조회 로직에 개선할 부분이 있나?
+
+'로그예시'
+2025-08-04 11:10:49  [223331] [13999999992316] INFO BigdataqueryGetData called.
+2025-08-04 11:10:49  [223331] [13999999992316] INFO BigdataqueryGetData : client_ip=127.0.0.1, query_param={'table_name': 'fab.m_fab_process','equipmentid': 'cp0001','if_step_seq':'cr001','if_lot_id': 'padf111','dateFrom': '2025-08-03','dateTo': '2025-08-04','like_conditions' : {'targetline' : '%A1%'}},custom_columns=['area', 'equipmentid', 'moduleid', 'workgroup', 'state', 'starttime', 'endtime', 'starttime_rev', 'endtime_rev', 'materialid', 'recipename', 'stepno', 'stepname', 'if_step_seq', 'if_lot_id', 'if_tkin_date']
+2025-08-04 11:10:50  [223331] [13999999992316] INFO BigdataqueryGetData completed.
+2025-08-04 11:10:53  [223331] [13999999992316] INFO BigdataqueryGetData called.
+2025-08-04 11:10:49  [223331] [13999999992316] INFO BigdataqueryGetData : client_ip=127.0.0.1, query_param={'table_name': 'fab.m_fab_process','equipmentid': 'cp0001','if_step_seq':'cr001','if_lot_id': 'padf111','dateFrom': '2025-08-03','dateTo': '2025-08-04','like_conditions' : {'targetline' : '%A1%'}},custom_columns=['area', 'equipmentid', 'moduleid', 'workgroup', 'state', 'starttime', 'endtime', 'starttime_rev', 'endtime_rev', 'materialid', 'recipename', 'stepno', 'stepname', 'if_step_seq', 'if_lot_id', 'if_tkin_date']
+2025-08-04 11:10:54  [223331] [13999999992316] INFO BigdataqueryGetData completed.
+2025-08-04 11:10:54  [223331] [13999999992316] INFO BigdataqueryGetData called.
+2025-08-04 11:10:49  [223331] [13999999992316] INFO BigdataqueryGetData : client_ip=127.0.0.1, query_param={'table_name': 'fab.m_fab_process','equipmentid': 'cp0001','if_step_seq':'cr001','if_lot_id': 'padf111','dateFrom': '2025-08-03','dateTo': '2025-08-04','like_conditions' : {'targetline' : '%A1%'}},custom_columns=['area', 'equipmentid', 'moduleid', 'workgroup', 'state', 'starttime', 'endtime', 'starttime_rev', 'endtime_rev', 'materialid', 'recipename', 'stepno', 'stepname', 'if_step_seq', 'if_lot_id', 'if_tkin_date']
+2025-08-04 11:10:58  [223331] [13999999992316] INFO BigdataqueryGetData completed.
+'''
     
 @bigdataquery_decorator
 def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
