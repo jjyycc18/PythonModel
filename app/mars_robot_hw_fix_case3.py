@@ -133,6 +133,8 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
             tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
             tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) + pd.DateOffset(minutes=60) if tkout is not None else None
+
+            # robot_motion_hist_df['step_seq']의 값에 robot_motion_hist_df['lot_seq']의 값이 다른2개 이상일때 (1:n 이라면) 아래를 적용한다면 코드를 어떻게 추가해야하나?  
             if kin is not None and tkout is not None :
                 robot_motion_hist_df = robot_motion_hist_df[
                     (tkin_dt <= robot_motion_hist_df['starttime_tev']) & (robot_motion_hist_df['endtime_rev'] <= tkout_dt)
