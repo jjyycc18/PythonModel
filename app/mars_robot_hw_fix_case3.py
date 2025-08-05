@@ -128,6 +128,15 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             # 3. 캐시에 없으면 bigdata조회
             robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
             
+            # 8월5일 추가분
+            
+            robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
+            tkin_dt = pd.to_datatime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
+            tkout_dt = pd.to_datatime(tkout.LOT_TRANSN_TMSTP) + pd.DateOffset(minutes=60) if tkout is not None else None
+            robot_motion_hist_df = robot_motion_hist_df[(tkin_dt <= robot_motion_hist_df['starttime_tev']) & (robot_motion_hist_df['endtime_rev'] <= tkout_dt)]
+            
+            # 8월5일 추가분
+            
             # 4. 
             robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)
             
