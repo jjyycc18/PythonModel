@@ -139,6 +139,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
                 robot_motion_hist_df = robot_motion_hist_df[
                     (tkin_dt <= robot_motion_hist_df['starttime_tev']) & (robot_motion_hist_df['endtime_rev'] <= tkout_dt)
                 ]
+            # 이부분에서 갑자기 '>=' not supported between instances of 'numpy.ndarray' and 'Timestamp' 가 나온다 어떻게 고쳐야 하나?    
             
             # 8월5일 추가분
             
