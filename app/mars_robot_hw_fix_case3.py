@@ -128,20 +128,26 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             # 3. 캐시에 없으면 bigdata조회
             robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
             
-            # 8월5일 추가분
-            
+            # 8월5일 추가분            
             robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
-            tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
-            tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) + pd.DateOffset(minutes=60) if tkout is not None else None
+            
+            # starttime_tev, endtime_rev 컬럼의 타임존 제거
+            robot_motion_hist_df['starttime_tev'] = pd.to_datetime(robot_motion_hist_df['starttime_tev']).dt.tz_localize(None)
+            robot_motion_hist_df['endtime_rev'] = pd.to_datetime(robot_motion_hist_df['endtime_rev']).dt.tz_localize(None)
 
-            # robot_motion_hist_df['step_seq']의 값에 robot_motion_hist_df['lot_seq']의 값이 다른2개 이상일때 (1:n 이라면) 아래를 적용한다면 코드를 어떻게 추가해야하나?  
-            if kin is not None and tkout is not None :
+            # tkin, tkout의 LOT_TRANSN_TMSTP에서 타임존 제거
+            tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
+            tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkout is not None else None
+            
+            if hasattr(tkin_dt, "tz_localize"):
+                tkin_dt = tkin_dt.tz_localize(None)
+            if hasattr(tkout_dt, "tz_localize"):
+                tkout_dt = tkout_dt.tz_localize(None)
+
+            if tkin is not None and tkout is not None :
                 robot_motion_hist_df = robot_motion_hist_df[
                     (tkin_dt <= robot_motion_hist_df['starttime_tev']) & (robot_motion_hist_df['endtime_rev'] <= tkout_dt)
                 ]
-            # 이부분에서 갑자기 '>=' not supported between instances of 'numpy.ndarray' and 'Timestamp' 가 나온다 어떻게 고쳐야 하나?   
-            # 이부분에서 되고, 안되고 한다  : Invalid comparison between dtype=datetime64[us, UTC] and Timestamp
-            
             # 8월5일 추가분
             
             # 4. 
@@ -388,7 +394,24 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.info(f"No process_hist_df data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            process_hist_df = bigdataquery_dao.get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)            
+            process_hist_df = bigdataquery_dao.get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
+
+            # 8월 추가분
+            process_hist_df = process_hist_df[
+                                ( process_hist_df['lotid'] == tkout.LOT_ID ) | ( process_hist_df['if_lot_id'] == tkout.LOT_ID )
+            ]
+
+            tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
+            tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkout is not None else None
+            
+            process_hist_df['starttime_rev'] = pd.to_datetime( process_hist_df['starttime_rev'], errors='coerce' )
+            process_hist_df['endtime_rev'] = pd.to_datetime( process_hist_df['endtime_rev'], errors='coerce' )
+
+            if tkin is not None and tkout is not None:
+                process_hist_df = process_hist_df[
+                                ( tkin_dt <= process_hist_df['starttime_rev'] ) | ( process_hist_df['endtime_rev'] <= tkout_dt ) ]
+            # 8월 추가분  
+            
             process_hist_df['wafer_id'] = process_hist_df['materialid'].apply(process_wafer_id)            
             process_hist_df = process_hist_df.sort_values(by=['starttime_rev'])
             process_hist_df = process_hist_df.reset_index(drop=True)
@@ -477,8 +500,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             # 4. 캐시에 없으면 bigdata조회
             fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
             fab_df_origin = fab_df_origin.dropna(subset['if_lot_id','if_step_seq']).reset_index(drop=True)    
-            fab_df_origin.replace('',pd.NA, inplace=True)
-            fab_df_origin = fab_df_origin_df.dropna()  
+            
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
             
@@ -504,7 +526,28 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                             (fab_df['materialid'] == material_id) 
                             & (fab_df['if_step_seq'] == step_seq) 
                             & (fab_df['if_lot_id'] == lot_id)
+                            & (fab_df['lotid'] == tkout.LOT_ID ) | (fab_df['if_lot_id'] == tkout.LOT_ID)
                             ].reset_index(drop=True)
+
+        # 8월5일 추가분            
+        # starttime_tev, endtime_rev 컬럼의 타임존 제거
+        filtered_df['starttime_tev'] = pd.to_datetime(filtered_df['starttime_tev']).dt.tz_localize(None)
+        filtered_df['endtime_rev'] = pd.to_datetime(filtered_df['endtime_rev']).dt.tz_localize(None)
+        
+        # tkin, tkout의 LOT_TRANSN_TMSTP에서 타임존 제거
+        tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
+        tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkout is not None else None
+        
+        if hasattr(tkin_dt, "tz_localize"):
+            tkin_dt = tkin_dt.tz_localize(None)
+        if hasattr(tkout_dt, "tz_localize"):
+            tkout_dt = tkout_dt.tz_localize(None)
+        
+        if tkin is not None and tkout is not None :
+            filtered_df = filtered_df[
+                (tkin_dt <= filtered_df['starttime_tev']) & (filtered_df['endtime_rev'] <= tkout_dt)
+            ]
+        # 8월5일 추가분
         
         moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
         
