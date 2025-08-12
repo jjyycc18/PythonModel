@@ -132,7 +132,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
             
             # starttime_tev, endtime_rev 컬럼의 타임존 제거
-            robot_motion_hist_df['starttime_tev'] = pd.to_datetime(robot_motion_hist_df['starttime_tev']).dt.tz_localize(None)
+            robot_motion_hist_df['starttime_rev'] = pd.to_datetime(robot_motion_hist_df['starttime_rev']).dt.tz_localize(None)
             robot_motion_hist_df['endtime_rev'] = pd.to_datetime(robot_motion_hist_df['endtime_rev']).dt.tz_localize(None)
 
             # tkin, tkout의 LOT_TRANSN_TMSTP에서 타임존 제거
@@ -449,8 +449,11 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.error('filtered_process_hist_df is empty.')
             return None
 
-        # 12. 결과 있으면 time_var 설정대로 결과 생성
+        # starttime_tev, endtime_rev 컬럼의 타임존 제거
+        filtered_process_hist_df['starttime_rev'] = pd.to_datetime(filtered_process_hist_df['starttime_rev'])
+        filtered_process_hist_df['endtime_rev'] = pd.to_datetime(filtered_process_hist_df['endtime_rev'])
         
+        # 12. 결과 있으면 time_var 설정대로 결과 생성        
         grouped = filtered_process_hist_df.groupby('moduleid')
 
         # 각 그룹을 starttime_rev로 오름차순 정렬
@@ -531,7 +534,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
 
         # 8월5일 추가분            
         # starttime_tev, endtime_rev 컬럼의 타임존 제거
-        filtered_df['starttime_tev'] = pd.to_datetime(filtered_df['starttime_tev']).dt.tz_localize(None)
+        filtered_df['starttime_rev'] = pd.to_datetime(filtered_df['starttime_rev']).dt.tz_localize(None)
         filtered_df['endtime_rev'] = pd.to_datetime(filtered_df['endtime_rev']).dt.tz_localize(None)
         
         # tkin, tkout의 LOT_TRANSN_TMSTP에서 타임존 제거
@@ -564,7 +567,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 if i -1 in fab_df_temp.index:
                     start_time = fab_df_temp.loc[i, 'starttime_rev'].tz_localize(tz=None)
                     end_time = fab_df_temp.loc[i - 1, 'endtime_rev'].tz_localize(tz=None)
-                    time_diff = (end_time - start_time).total_seconds()
+                    time_diff = (start_time - end_time).total_seconds()
                     result.append(time_diff)
                 else:
                     result.append(-1)
