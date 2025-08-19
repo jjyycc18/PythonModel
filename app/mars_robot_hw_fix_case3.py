@@ -501,8 +501,10 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             logger.info(f"No fab_df_origin data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) 
-            fab_df_origin = fab_df_origin.dropna(subset['if_lot_id','if_step_seq']).reset_index(drop=True)    
+            fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, lot_id, step_seq, start_date, end_date) )
+            fab_df_origin = fab_df_origin.dropna(subset=['if_lot_id','if_step_seq']).reset_index(drop=True)   
+
+            fab_df_origin = fab_df_origin[fab_df_origin['materialid'].str.strip() != 'EMPTY']
             
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
@@ -540,7 +542,9 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 (tkin_dt <= filtered_df_temp['starttime_tev']) & (filtered_df_temp['endtime_rev'] <= tkout_dt)
             ]
             
-        if not filtered_df_temp.empty:                
+        if not filtered_df_temp.empty:       
+            # wafer_id로 정확히 걸러야 한다.
+            filtered_df_temp = filtered_df_temp[(filtered_df_temp['wafer_id'] == wafer_id) | (filtered_df_temp['wafer_id'] == int(wafer_id))]
             material_id = filtered_df_temp['materialid'].iloc[0]
         else:
             return [-1]
@@ -550,7 +554,6 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                             & (fab_df['lotid'] == tkout.LOT_ID ) | (fab_df['if_lot_id'] == tkout.LOT_ID)
                             ].reset_index(drop=True)
 
-        # 8월5일 추가분            
         # starttime_tev, endtime_rev 컬럼의 타임존 제거
         filtered_df['starttime_rev'] = pd.to_datetime(filtered_df['starttime_rev']).dt.tz_localize(None)
         filtered_df['endtime_rev'] = pd.to_datetime(filtered_df['endtime_rev']).dt.tz_localize(None)
@@ -559,22 +562,38 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             filtered_df = filtered_df[
                 (tkin_dt <= filtered_df['starttime_tev']) & (filtered_df['endtime_rev'] <= tkout_dt)
             ]
-        # 8월5일 추가분
-        
+              
         moduleid_distinct = filtered_df['moduleid'].drop_duplicates().tolist()
         
         result = []
-        for module_id in moduleid_distinct
-            fab_df_temp = fab_df[fab_df['moduleid'] = module_id].sort_values(by='starttime_rev').reset_index(drop=True)
+        for module_id in moduleid_distinct:
+            # 1. starttime_rev, endtime_rev 기준 오름차순 정렬
+            fab_df_temp = filtered_df[filtered_df['moduleid'] == module_id].sort_values(by=['starttime_rev', 'endtime_rev'], ascending=True).reset_index(drop=True)
             
-            match = fab_df_temp[(fab_df_temp[materialid] == material_id)].index
+            # 2. material_id 기준으로 현재 wafer의 인덱스 찾기
+            match = fab_df_temp[fab_df_temp['materialid'] == material_id].index
             
             if not match.empty:
-                i = match[0]
-                if i -1 in fab_df_temp.index:
-                    start_time = fab_df_temp.loc[i, 'starttime_rev'].tz_localize(tz=None)
-                    end_time = fab_df_temp.loc[i - 1, 'endtime_rev'].tz_localize(tz=None)
-                    time_diff = (start_time - end_time).total_seconds()
+                cur_idx = match[0]
+                cur_start_time = fab_df_temp.loc[cur_idx, 'starttime_rev'].tz_localize(tz=None)
+                pre_end_time = None
+
+                # 3. 이전 wafer 찾기 (최대 4장 동시 투입 고려)
+                try:
+                    # 역순으로 이전 row에서 starttime_rev가 다르면 해당 row의 endtime_rev를 사용
+                    for offset in range(1, 5):
+                        prev_idx = cur_idx - offset
+                        if prev_idx < 0:
+                            break
+                        if fab_df_temp.loc[cur_idx, 'starttime_rev'] != fab_df_temp.loc[prev_idx, 'starttime_rev']:
+                            pre_end_time = fab_df_temp.loc[prev_idx, 'endtime_rev'].tz_localize(tz=None)
+                            break
+                    # 만약 모든 이전 row가 동일하다면 pre_end_time은 None
+                except Exception as e:
+                    logger.error(f"이전 wafer 찾을때 오류 발생함: {e}")
+
+                if pre_end_time is not None:
+                    time_diff = (cur_start_time - pre_end_time).total_seconds()
                     result.append(time_diff)
                 else:
                     result.append(-1)        
@@ -583,7 +602,6 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
     except Exception as e:
         logger.exception(f"Error in mars_time_p_idle: {str(e)}")
         return None
-    
 
 
 if __name__ == "__main__":
