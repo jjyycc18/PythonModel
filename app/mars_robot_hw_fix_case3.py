@@ -409,7 +409,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
 
             if tkin is not None and tkout is not None:
                 process_hist_df = process_hist_df[
-                                ( tkin_dt <= process_hist_df['starttime_rev'] ) | ( process_hist_df['endtime_rev'] <= tkout_dt ) ]
+                                ( tkin_dt <= process_hist_df['starttime_rev'] ) & ( process_hist_df['endtime_rev'] <= tkout_dt ) ]
             # 8월 추가분  
             
             process_hist_df['wafer_id'] = process_hist_df['materialid'].apply(process_wafer_id)            
@@ -568,7 +568,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
         result = []
         for module_id in moduleid_distinct:
             # 1. starttime_rev, endtime_rev 기준 오름차순 정렬
-            fab_df_temp = filtered_df[filtered_df['moduleid'] == module_id].sort_values(by=['starttime_rev', 'endtime_rev'], ascending=True).reset_index(drop=True)
+            fab_df_temp = fab_df[fab_df['moduleid'] == module_id].sort_values(by=['starttime_rev', 'endtime_rev'], ascending=True).reset_index(drop=True)
             
             # 2. material_id 기준으로 현재 wafer의 인덱스 찾기
             match = fab_df_temp[fab_df_temp['materialid'] == material_id].index
