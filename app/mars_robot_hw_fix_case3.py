@@ -569,26 +569,28 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
         for module_id in moduleid_distinct:
             # 1. starttime_rev, endtime_rev 기준 오름차순 정렬
             fab_df_temp = fab_df[fab_df['moduleid'] == module_id].sort_values(by=['starttime_rev', 'endtime_rev'], ascending=True).reset_index(drop=True)
-            
+           
             # 2. material_id 기준으로 현재 wafer의 인덱스 찾기
             match = fab_df_temp[fab_df_temp['materialid'] == material_id].index
-            
+           
             if not match.empty:
                 cur_idx = match[0]
                 cur_start_time = fab_df_temp.loc[cur_idx, 'starttime_rev'].tz_localize(tz=None)
                 pre_end_time = None
 
-                # 3. 이전 wafer 찾기 (최대 4장 동시 투입 고려)
+                # 3. 이전 wafer 찾기 (최대 8장 동시 투입 고려, 1초 이내면 동일 wafer로 판단)
                 try:
-                    # 역순으로 이전 row에서 starttime_rev가 다르면 해당 row의 endtime_rev를 사용
-                    for offset in range(1, 5):
+                    # 이전 8행까지 체크
+                    for offset in range(1, 9):
                         prev_idx = cur_idx - offset
                         if prev_idx < 0:
                             break
-                        if fab_df_temp.loc[cur_idx, 'starttime_rev'] != fab_df_temp.loc[prev_idx, 'starttime_rev']:
+                        prev_start_time = fab_df_temp.loc[prev_idx, 'starttime_rev'].tz_localize(tz=None)
+                        time_diff_sec = abs((cur_start_time - prev_start_time).total_seconds())
+                        if time_diff_sec > 1:  # 1초를 초과하면 다른 wafer로 판단
                             pre_end_time = fab_df_temp.loc[prev_idx, 'endtime_rev'].tz_localize(tz=None)
                             break
-                    # 만약 모든 이전 row가 동일하다면 pre_end_time은 None
+                    # 만약 모든 이전 row가 1초 이내로 동일하다면 pre_end_time은 None
                 except Exception as e:
                     logger.error(f"이전 wafer 찾을때 오류 발생함: {e}")
 
@@ -596,8 +598,8 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                     time_diff = (cur_start_time - pre_end_time).total_seconds()
                     result.append(time_diff)
                 else:
-                    result.append(-1)        
-        return result  
+                    result.append(-1)
+        return result       
         
     except Exception as e:
         logger.exception(f"Error in mars_time_p_idle: {str(e)}")
