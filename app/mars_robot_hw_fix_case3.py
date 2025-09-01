@@ -503,8 +503,6 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             # 4. 캐시에 없으면 bigdata조회
             fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, start_date, end_date) )
             fab_df_origin = fab_df_origin.dropna(subset=['if_lot_id','if_step_seq']).reset_index(drop=True)   
-
-            fab_df_origin = fab_df_origin[fab_df_origin['materialid'].str.strip() != 'EMPTY']
             
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
@@ -518,6 +516,13 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             logger.info(f"found p_idle data in cache (key={cache_key})")
                                                  
         fab_df = fab_df_origin.copy()
+
+        # 수정사항 mars_time_p_idle()의 520줄부터 수정하자
+        # 1. fab_df 를 가지고 527줄 아래를 실행하여 result[]를 생성한다
+        # 2. fab_df_filter = fab_df_origin[fab_df_origin['materialid'].str.strip() != 'EMPTY'] 를 가지고 527줄 아래를 한번 더
+        #    실행하여 result_filter[]를 생성한다
+        # 3. result_new = [ [a,b] for a,b in zip(fab_df , fab_df_filter) ] 를 최종 반환하도록 변경해줘  527줄아래를 2번 반복해야되는데
+        #    최적의 방법으로 구현해줘
         
         # mod-3. tkin, tkout의 LOT_TRANSN_TMSTP에서 타임존 제거
         tkin_dt = pd.to_datetime(tkin.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkin is not None else None
