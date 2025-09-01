@@ -24,3 +24,13 @@ starttime_rev가 같은 wafer가 최대 4장이 될 수 있는 경우가 발생�
     except Exception as e:
        print(f"이전 wafer 찾을때 오류 발생함: {e}") 
    '''
+
+수정사함
+1. mars_time_p_idle() 함수에서는 현재 결과를 result[i] 로 반환하는데
+2. result[i][0] , result[i][1] 로 두개 쌍으로 값을 반환한다
+3. result[i][1] 에는 기존의 결과 값인 result[i] 의 값이 들어가면 된다  ( materialid, stepnmame 칼럼에 "EMPTY" , null 이 제외된 레코드set의 결과값)
+4. result[i][0] 에는 materialid, stepnmame 칼럼에 "EMPTY" , null 이 포함된 레코드set 에서의 결과값 이 들어가면 된다
+
+수정사함
+1. mars_time_process() 함수에서는 현재 결과를 산출하는 레코드셋에서 ['stepname']이 null 이 아니거나 또는 빈값이 아닌  레코드셋에서 결과를 산출하자
+   
