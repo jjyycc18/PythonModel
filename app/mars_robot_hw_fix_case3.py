@@ -570,6 +570,12 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             result = []
             for module_id in moduleid_distinct:
                 fab_df_temp = fab_df_input[fab_df_input['moduleid'] == module_id].sort_values(by=['starttime_rev', 'endtime_rev'], ascending=True).reset_index(drop=True)
+
+                # 검색범위가 lot의 기준범위로 한정한다. 중요함 !!!
+                fab_df_temp['starttime_rev'] = pd.to_datetime(fab_df_temp['starttime_rev']).dt.tz_localize(None)
+                fab_df_temp['endtime_rev'] = pd.to_datetime(fab_df_temp['endtime_rev']).dt.tz_localize(None)
+                fab_df_temp = fab_df_temp[(tkin_dt <= fab_df_temp['starttime_rev']) & (fab_df_temp['endtime_rev'] <= tkout_dt)]
+                    
                 match = fab_df_temp[fab_df_temp['materialid'] == material_id].index
                 if not match.empty:
                     cur_idx = match[0]
@@ -595,12 +601,9 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             return result
 
         # 1. 전체 데이터로 계산
-        result = calc_p_idle_result(fab_df, material_id, moduleid_distinct)
-        
+        result = calc_p_idle_result(fab_df, material_id, moduleid_distinct)        
         # 2. materialid가 'EMPTY'가 아닌 데이터로 계산
-        fab_df_filter = fab_df_origin[(fab_df_origin['materialid'].str.strip() != 'EMPTY') &
-                                        (fab_df_origin['stepname'] != "")].copy()
-
+        fab_df_filter = fab_df_origin[(fab_df_origin['materialid'].str.strip() != 'EMPTY') & (fab_df_origin['stepname'] != "")].copy()
         # 2-1. stepname is notna 인 데이터로 계산
         fab_df_filter = fab_df_filter.dropna(subset=['stepname']).reset_index(drop=True)
         
