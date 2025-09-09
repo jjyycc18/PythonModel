@@ -1,62 +1,85 @@
-hw_motion_history 테이블의 lot mapping rule
-'''
-material_id의 값과 tkin/tkout의 carr_id를 비교하여 lot을 구분하여 3가지의 lot mapping case가 존재하는데, case1, 과 case2는 이미 소스상에 구현되어있다. case3을 구현해여 코딩을 추가해줘.
-'''
-'''
-case1) : 모든 state에 material_id가 존재한다고 가정('EMPTY'가 아닌경우) -> material_id 변환없이 CARR_ID와 비교하요 LOT MAPPING. (구현된 소스와 같이)
-case2) : 일부 state에만 material_id가 존재한다고 가정('READID'로) -> material_id = 'EMPTY'에 대해  CARR_ID와 동일한 READID의 material_id를 찾아서 시간 기반으로 LABELING (구현된 소스변경)
-case2)의 아래와 같이 다시 LABELING 코드를 알려줘
-  - READID state에 material_id가 나오는 경우 lot시작은 READID시작 시간 기준으로 mapping하고 lot끝은 robot_motion_history 테이블의 가장 마지막 시간으로 mapping 함 (offset은 2분)
-  - lot_start_time = pd.to_datatime(sorted_df.loc[i,'starttime_rev']) + pd.DateOffset(minutes = -2)
-  - lot_end_time = pd.to_datatime(sorted_df.tail(1)['endtime_rev'].values[0]) + pd.DateOffset(minutes = 2)
+#전역 변수 선언
+excluded_nums = []
+
+1. 338줄 "# 최종 추천 번호 결정"
+excluded_nums.extend( [final_recommendation[i] for i in [0,1,2,3,4,5]] )
+
+2. 544줄 "상위 3개 세트를 우선 추천합니다!"
+  global excluded_nums
+  for s in final_7_sets:
+    excluded_nums.extend( [s[i] for i in [0,2,3,4,5]] )
+
+3."방법 1: 전체 빈도 분석"
+  global excluded_nums
+  excluded_nums.extend( [prediction1[i] for i in [2,3,4,5]] )
+
+4."방법 2: 최근 빈도 분석"
+  excluded_nums.extend( [prediction2[i] for i in [0,1,2,3,4,5]] )
+
+5."방법 3: 균형 분석"
+  excluded_nums.extend( [prediction3[i] for i in [0,1,2,3,4]] )
+
+6."방법 4: 패턴 분석"
+  excluded_nums.extend( [prediction4[i] for i in [0,2,3,4]] )
+
+7."방법 5: AI 복합 분석"
+  excluded_nums.extend( [prediction5[i] for i in [0,2,3,4,5]] )
+
+8."방법 6: 당첨 간격 분석"
+  excluded_nums.extend( [prediction6[i] for i in [0,1,2,3,4,5]] )
+
+9. "수열 분석 결과 TOP 15:"
+  if ..
+        if i < 11:
+            excluded_nums.extend(num[])
+
+#jyc 맨 마지막에
+  excluded_nums = list(set(excluded_nums))
+  excluded_nums.sort()
+  print(f"**예상 제외번호 : {excluded_nums}")
+
+  nums = list(range(1,46))
+  remain_nums = list(set(nums) - set(excluded_nums))
+  remain_nums.sort()
+  print(f"**예상 번호 : {remain_nums}")
+
+# request : 
+1. excluded_nums 에 있는 1~ 9까지 수에서 1개선택 (최근 마지막 추첨결과에서 1~ 9까지 수가 존재하고 , 그 숫자가 5보다 작으면 5이상 수를 선택)
+2. excluded_nums 에 있는 10~ 19까지 수에서 1개선택 (최근 마지막 추첨결과에서 10~ 19까지 수가  존재하고 , 그 숫자가 15보다 작으면 15이상에서 수를 선택)
+3. excluded_nums 에 있는 20~ 29까지 수에서 1개선택 (최근 마지막 추첨결과에서 21~ 29까지 수가  존재하고 , 그 숫자가 25보다 작으면 25이상에서 수를 선택)
+4. excluded_nums 에 있는 30~ 39까지 수에서 1개선택 (최근 마지막 추첨결과에서 31~ 39까지 수가  존재하고 , 그 숫자가 35보다 작으면 25이상에서 수를 선택)
+5. remain_nums 에 있는 1~ 9까지 수에서 1개선택 (최근 마지막 추첨결과에서 1~ 9까지 수가 존재하고 , 그 숫자가 5보다 작으면 5이상 수를 선택)
+6. remain_nums 에 있는 40~ 45까지 수에서 1개선택 (최근 마지막 추첨결과에서 40~ 45까지 수가  존재하고 , 그 숫자가 43보다 작으면 43이상에서 수를 선택.
+                                            최근 마지막 추첨결과에서 40~ 45까지 수가  존재하지 않으면,  43이상에서 수를 선택. )
+이 RULE을 바탕으로 총 10 SETS 를 추첨해줘 (추첨결과는 중복이 없어야한다.) 
 
 
 
-case3) : 모든 state에 대해 material_id == 'EMPTY' 인 경우 -> LOT 진행 시간 정보만으로 material_id == 'EMPTY'에 대해 CARR_ID로 LABELING 하자.
-'''
-'''
-case3)의 예시
-- material_id 가 모두 'EMPTY' 인 경우 -> LOT 시작은 TKIN 시간 또는 ROBOT_MOTION_HISTORY 시작 중 빠른 시간 기준으로 MAPPING하고 LOT의 끝은 ROBOT_MOTION_HISTORY테이블의 가장 마지막 시간으로 MAPPING (오프셋은 2분)
-- lot_start_time = tkin_time + pd.DateOffset(minutes = -2)
-- lot_start_time = pd.to_datatime(sorted_df.head(1)['endtime_rev'].values[0]) + pd.DateOffset(minutes = -2)
-- lot_end_time = pd.to_datatime(sorted_df.tail(1)['endtime_rev'].values[0]) + pd.DateOffset(minutes = 2)
-
-case3) exemple 
-'''
-EQP  STEP  LOT  항목  TIME  Timming  ETC  LOGIC
-----------------------------------------------------------------------------
-EQ1  ST1  LT1  TIIN  2025-05-25 21:21:59.000  -  PCP01  TKIN-2min
-EQ1  ST1  LT1  chuck  2025-05-25 21:21:59.000  srart  EMPTY  
-EQ1  ST1  LT1  dooropen  2025-05-25 21:21:59.000  srart  EMPTY  
-EQ1  ST1  LT1  dooropen  2025-05-25 21:26:59.000  end  EMPTY  
-EQ1  ST1  LT1  dechuck  2025-05-25 21:27:59.000  srart  -  
-EQ1  ST1  LT1  chuck  2025-05-25 21:21:38.000  end  EMPTY  ROBOT_END + 2min
-EQ1  ST1  LT1  dechuck  2025-05-25 21:39:59.000  end  EMPTY  ROBOT_END + 2min
-EQ1  ST1  LT1  TKOUT  2025-05-25 21:40:59.000  -  PCP01  rev. 시간보정 ok  
-----------------------------------------------------------------------------
-'''
 
 
-try:
-        # READID row 중 material_id가 EMPTY가 아닌 index 추출
-        readid_idx = hw_motion_hist_df[(hw_motion_hist_df['state'] == 'READID') & (hw_motion_hist_df['material_id'] != 'EMPTY')].index
-        if len(readid_idx) == 0:
-            return hw_motion_hist_df  # case2가 아님
 
-        hw_motion_hist_df = hw_motion_hist_df.copy()
-        sorted_df = robot_motion_hist_df.sort_values(by='endtime_rev')
 
-        # robot_motion_history의 마지막 endtime_rev
-        lot_end_time = pd.to_datetime(sorted_df.tail(1)['endtime_rev'].values[0]) + pd.DateOffset(minutes=2)
-        lot_start_time = pd.to_datetime(hw_motion_hist_df.loc[i, 'starttime_rev']) + pd.DateOffset(minutes=-2)
-        
-        # 해당 lot 구간에서 material_id가 EMPTY인 행만 carr_id로 매핑
-        mask = (
-            (hw_motion_hist_df['start_time_rev'] >= lot_start_time) &
-            (hw_motion_hist_df['start_time_rev'] <= lot_end_time) &
-            (hw_motion_hist_df['material_id'] == 'EMPTY')
-        )
-        hw_motion_hist_df.loc[mask, 'material_id'] = carr_id
-        return hw_motion_hist_df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
