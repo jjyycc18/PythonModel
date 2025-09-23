@@ -549,10 +549,10 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
         else:
             return [[-1], [-1]]  # 두 결과 모두 -1로 반환
 
-        # mod 조건 추가
+        # mod 조건 추가 대괄호추가 0924
         filtered_df = fab_df[
                             (fab_df['materialid'] == material_id) & 
-                            (fab_df['lotid'] == tkout.LOT_ID ) | (fab_df['if_lot_id'] == tkout.LOT_ID)
+                            ((fab_df['lotid'] == tkout.LOT_ID ) | (fab_df['if_lot_id'] == tkout.LOT_ID))
                       ].reset_index(drop=True)
 
         # starttime_rev, endtime_rev 컬럼의 타임존 제거
@@ -577,8 +577,29 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 tkout_dt = pd.to_datetime(tkout.LOT_TRANSN_TMSTP) - pd.DateOffset(minutes=60) if tkout is not None else None    
 
                 fab_df_temp_pos = fab_df_temp[(tkin_dt <= fab_df_temp['starttime_rev']) & (fab_df_temp['endtime_rev'] <= tkout_dt)]
-                # 기준위치     
-                match = fab_df_temp_pos[fab_df_temp_pos['materialid'] == material_id].index
+                
+                # 0924 기준위치     
+                # match를 구할때 아래 조건에서 and로 다음조건이 추가 되어야 한다. 
+                # fab_df_temp_pos['materialid'] 의 값에서 구분자 ':','.','_','-','.' 이것중 하나가 있다면
+                # 구분하여 앞에있는 값이 (ex: 'cb:1') 에서 text 'cb' 가  이전행의 값과 다른른행들을 모두 찾아야한다
+                
+                # materialid의 prefix를 추출하는 함수
+                def get_materialid_prefix(materialid):
+                    import re
+                    # 구분자 ':','.','_','-' 중 하나로 분리
+                    delimiters = r'[:._ -]'
+                    parts = re.split(delimiters, str(materialid))
+                    return parts[0] if parts else str(materialid)
+                
+                # 이전 행과 prefix가 다른 조건 추가
+                fab_df_temp_pos['materialid_prefix'] = fab_df_temp_pos['materialid'].apply(get_materialid_prefix)
+                fab_df_temp_pos['prev_materialid_prefix'] = fab_df_temp_pos['materialid_prefix'].shift(1)
+                
+                # 기본 조건과 prefix 변경 조건을 결합
+                basic_condition = fab_df_temp_pos['materialid'] == material_id
+                prefix_change_condition = (fab_df_temp_pos['materialid_prefix'] != fab_df_temp_pos['prev_materialid_prefix']) | fab_df_temp_pos['prev_materialid_prefix'].isna()
+                
+                match = fab_df_temp_pos[basic_condition & prefix_change_condition].index
                 
                 if not match.empty:
                     cur_idx = match[0]
