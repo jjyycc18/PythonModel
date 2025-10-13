@@ -17,6 +17,9 @@ recent_draws = [
 # 1~45까지 번호
 all_numbers = set(range(1, 46))
 
+# 제외할 숫자들 (전역 변수)
+except_nums = [1,2,3,4,5,6,7,8,9,10]
+
 # 각 번호별 출현 횟수 계산
 freq = {num: 0 for num in all_numbers}
 for draw in recent_draws:
@@ -49,6 +52,10 @@ def digit_group(num):
         return 40
 
 def is_valid_set(numbers):
+    # except_nums 에 포함된 수가 있으면 False 반환
+    if any(num in except_nums for num in numbers):
+        return False
+
     total = sum(numbers)
     if not (105 <= total <= 169):
         return False
