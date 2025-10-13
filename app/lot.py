@@ -26,6 +26,16 @@ for draw in recent_draws:
     for num in draw:
         freq[num] += 1
 
+# 지난 출현 숫자
+recent_numbers = []
+for numbers in recent_numbers
+    recent_numbers.extend(numbers)
+recent_numbers.sort()
+recent_numbers2 = set(recent_numbers)
+print(f" 최근10회 출현수들 : {recent_numbers2}")
+cold_numbers = [nums for nums in range(1,46) if nums not in recent_numbers2 ]
+print(f" 최근10회 비 출현수들 : {cold_numbers}")
+
 # 그룹별 분류
 result_last_10times = {0: [], 1: [], 2: [], 3: []}
 for num, count in freq.items():
