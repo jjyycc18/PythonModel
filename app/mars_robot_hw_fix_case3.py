@@ -49,6 +49,10 @@ def process_wafer_id(material_id):
         parts = material_id.split('_')
         num = parts[-1].zfill(2)
         return num
+    elif '-' in material_id:
+        parts = material_id.split('-')
+        num = parts[-1].zfill(2)
+        return num    
     elif '.' in material_id:
         parts = material_id.split('.')
         num = ''.join(filter(str.isdigit, parts[-1])).zfill(2)
@@ -160,8 +164,8 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             # 4. 
             robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)
             
-            # 5. starttime 기준으로 정렬, 인덱스 초기화
-            robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime'])
+            # 5. starttime 기준으로 정렬, 인덱스 초기화 1015 starttime --> starttime_rev
+            robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime_rev'])
             robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
 
             # 6. 
