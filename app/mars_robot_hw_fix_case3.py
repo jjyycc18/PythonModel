@@ -116,6 +116,9 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
         # 1. 전처리 작업
         root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
+        # site 정보 10-15추가 1  
+        site_name = vm_dao.get_site_info()
+
         # 캐시에 조회
         cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
@@ -126,7 +129,11 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             logger.info(f"No robot motion data in cache (key={cache_key})")
             
             # 3. 캐시에 없으면 bigdata조회
-            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
+            # robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
+            # 1015 수정
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history_new(site_name, eqp_id, start_date, end_date)
+
+            # 1015 여기에 robot_motion_hist_df is None 이면 끝내는 부분 필요
             
             # 8월5일 추가분            
             robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
