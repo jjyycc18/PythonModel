@@ -109,6 +109,31 @@ def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, 
    hw_process_hist_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     
     return hw_process_hist_df
+
+# bigdataquery 방식을 sql방식대로 할려고 한다
+#site정보를 가져온후  site = vm_dao.get_site_info()
+#호출주소는
+#if site = 'MEM' 이면 http://127.0.0.1:8075/bigdataquery/getdataBySql
+#if site = 'FDRY' 이면 http://127.0.0.1:8076/bigdataquery/getdataBySql
+#파라미터: {"query": "sql쿼리문"}
+#{
+#    "query": "select distinct targetline from fab.m_mars_eqp_info where 1=1 and equipmentid = 'EAOEJ05'"
+#}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
 @bigdataquery_decorator
 def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
@@ -140,3 +165,4 @@ def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
             ['line_id', 'device_id', 'step_seq', 'item_id'],
             [row['line_id'], row['process_id'], row['step_seq'], row['item_id']]))
     return vm_data_list
+
