@@ -1,3 +1,9 @@
+space_db_if_service = {
+    "bigdataquery_getdata" : "http://127.0.0.1:8075/bigdataquery/getdata",
+    "bigdataquery_getdata_sql_mem" : "http://127.0.0.1:8076/bigdataquery/getdataBysql",
+    "bigdataquery_getdata_sql_fdry" : "http://127.0.0.1:8077/bigdataquery/getdataBysql"
+}    
+
 multi_version_executor = {
     "PY36": "http://127.0.0.1:7001",
     "PY37": "http://127.0.0.1:7002",
