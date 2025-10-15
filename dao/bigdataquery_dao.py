@@ -120,20 +120,50 @@ def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, 
 #    "query": "select distinct targetline from fab.m_mars_eqp_info where 1=1 and equipmentid = 'EAOEJ05'"
 #}
 
+@bigdataquery_decorator
+def get_targetline_by_site_and_eqp(site,eqp_id):
+    if site == 'MEM':
+        url = "http://127.0.0.1:8075/bigdataquery/getdataBySql"
+    elif site == 'FDRY':
+        url = "http://127.0.0.1:8076/bigdataquery/getdataBySql"
+    else:
+        raise ValueError(f"Unknown site: {site}")
 
+    sql_query = f"select distinct targetline from eqp_info where 1=1 and equipmentid = '{eqp_id}'"
+    param_dict = {"query":sql_query}
+    #rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
+    rc = HttpRequestClient(url, param_dict, 60 * 10 * 2)
+    df =  pd.read_json(rc.get_result())
 
+    if 'targetline' in df.columns and not df['targetline'].dropna().empty:
+        return df['targetline'].dropna().iloc[0]
+    else:
+        return None
 
+@bigdataquery_decorator
+def get_eqp_robot_motion_history_new(site, eqp_id, start_date, end_date):
+    if site == 'MEM':
+        url = "http://127.0.0.1:8075/bigdataquery/getdataBySql"
+    elif site == 'FDRY':
+        url = "http://127.0.0.1:8076/bigdataquery/getdataBySql"
+    else:
+        raise ValueError(f"Unknown site: {site}")
+    
+    targetline_name = get_targetline_by_site_and_eqp(site, eqp_id)
+    
+    sql_query = ("  select * from fab.m_robot_motion_his "
+                 f"   where 1=1 and equipmentid = '{eqp_id}'"
+                 f"    and targetline = '{targetline_name}'"
+                 f"    and dateonly >= '{start_date} 00:00:00' "
+                 f"    and dateonly <= '{end_date} 00:00:00' "
+                )
+    
+    param_dict = {"query":sql_query}
+    
+    rc = HttpRequestClient(url, param_dict, 60 * 10 * 2)
+    df =  pd.read_json(rc.get_result())
 
-
-
-
-
-
-
-
-
-
-
+    return df
     
 @bigdataquery_decorator
 def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
