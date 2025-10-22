@@ -37,8 +37,19 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
     # robot_motion, hw_motion 시간 조회 범위는 TKIN -1 ~ TKOUT +1
     start_date = (tkin.LOT_TRANSN_TMSTP + timedelta(days=-1)).strftime("%Y-%m-%d")
     end_date = (tkout.LOT_TRANSN_TMSTP + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    #target_line도 캐쉬에 넣는다
+    cache_key = f"MARS_EQP_LINE|{eqp_id}"
+    mars_eqp_line_df, ttl = redis_cache.load_dataframe_from_fedis(cache_key)
+
+    if mars_eqp_line_df is None or ttl is None:
+        target_line = bigdataquery_dao.get_targetline_by_site_and_eqp(eqp_id)
+        df = pd.DataFrame([[target_line]], columns=['targetline'])
+        redis_cache.save_dataframe_to_redis(cache_key,df)
+    else:
+        target_line = mars_eqp_line_df.iloc[0,0]
     
-    return root_lot_id, tkin, tkout, line_name, start_date, end_date
+    return root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line
 
 def process_wafer_id(material_id):
     if ':' in material_id:
@@ -133,9 +144,9 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             logger.info(f"No robot motion data in cache (key={cache_key})")
             
             # 3. 캐시에 없으면 bigdata조회
-            # robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)
+            # robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(target_line, eqp_id, lot_id, step_seq, start_date, end_date)
             # 1015 수정
-            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history_new(site_name, eqp_id, start_date, end_date)
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history_new(target_line, eqp_id, start_date, end_date)
 
             # 1015 여기에 robot_motion_hist_df is None 이면 끝내는 부분 필요
             
@@ -233,7 +244,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             logger.info(f"No robot motion data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date)            
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(target_line, eqp_id, lot_id, step_seq, start_date, end_date)            
             robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)            
             robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime_rev'])
             robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
@@ -277,7 +288,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             logger.info(f"No hw motion data in cache (key={hw_cache_key})")
             
             # 9. 캐시에 없으면 bigdata조회
-            hw_motion_hist_df = bigdataquery_dao.get_eqp_hw_motion_history(line_name, eqp_id, src_module_id, work_var, start_date, end_date)
+            hw_motion_hist_df = bigdataquery_dao.get_eqp_hw_motion_history(target_line, eqp_id, src_module_id, work_var, start_date, end_date)
             
             if hw_motion_hist_df is None or hw_motion_hist_df.empty:
                 logger.error('hw_motion_hist_df is empty.')
@@ -405,7 +416,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             logger.info(f"No process_hist_df data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            process_hist_df = bigdataquery_dao.get_eqp_hw_process_history(line_name, eqp_id, start_date, end_date) 
+            process_hist_df = bigdataquery_dao.get_eqp_hw_process_history(target_line, eqp_id, start_date, end_date) 
 
             # mod-2.
             process_hist_df = process_hist_df[
@@ -514,7 +525,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             logger.info(f"No fab_df_origin data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((line_name, eqp_id, start_date, end_date) )
+            fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((target_line, eqp_id, start_date, end_date) )
             fab_df_origin = fab_df_origin.dropna(subset=['if_lot_id','if_step_seq']).reset_index(drop=True)           
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
