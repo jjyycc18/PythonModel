@@ -142,32 +142,13 @@ def get_targetline_by_site_and_eqp(site,eqp_id):
 
 @bigdataquery_decorator
 def get_eqp_robot_motion_history_new(site, eqp_id, start_date, end_date):
-    #if site == 'MEM':
-    #    url = "http://127.0.0.1:8075/bigdataquery/getdataBySql"
-    #elif site == 'FDRY':
-    #    url = "http://127.0.0.1:8076/bigdataquery/getdataBySql"
-    #else:
-    #    raise ValueError(f"Unknown site: {site}")
-    
-    targetline_name = get_targetline_by_site_and_eqp(site, eqp_id)
-    
-    sql_query = ("  select * from fab.m_robot_motion_his "
-                 f"   where 1=1 and equipmentid = '{eqp_id}'"
-                 f"    and targetline = '{targetline_name}'"
-                 f"    and dateonly >= '{start_date} 00:00:00' "
-                 f"    and dateonly <= '{end_date} 00:00:00' "
-                )
-    
-    param_dict = {"query":sql_query}
-
-    if site == 'MEM':
-        rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata_sql_mem'], param_dict, 60 * 10 * 2)
-    elif site == 'FDRY':
-        rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata_sql_fdry'], param_dict, 60 * 10 * 2)
-    else:
-        raise ValueError(f"Unknown site: {site}")
-    
-    df =  pd.read_json(rc.get_result())
+    sql_query =(" select lotid, if_lot_id "
+                "  from test "
+                f" where equipmetid = '{eqp_id}'"
+               )
+    param_dict = {"query": sql_query}
+    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata_sql'], param_dict, 60 * 10 * 2)
+    df =  pd.read_json(rc.get_result(), dtype={'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
 
     return df
     
