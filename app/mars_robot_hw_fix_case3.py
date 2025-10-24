@@ -526,7 +526,11 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             
             # 4. 캐시에 없으면 bigdata조회
             fab_df_origin = bigdataquery_dao.get_eqp_p_idle_history((target_line, eqp_id, start_date, end_date) )
-            fab_df_origin = fab_df_origin.dropna(subset=['if_lot_id','if_step_seq']).reset_index(drop=True)           
+
+            if fab_df_origin.empty:
+                return None
+                
+            #fab_df_origin = fab_df_origin.dropna(subset=['if_lot_id','if_step_seq']).reset_index(drop=True)           
             fab_df_origin['wafer_id'] =  fab_df_origin['materialid'].apply(process_wafer_id)
             fab_df_origin = fab_df_origin.sort_values(by='starttime_rev').reset_index(drop=True)
             
@@ -606,49 +610,47 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 # 구분하여 앞에있는 값이 (ex: 'cb:1') 에서 text 'cb' 가  이전행의 값과 다른른행들을 모두 찾아야한다
                 
                 # materialid의 prefix를 추출하는 함수
-                def get_materialid_prefix(materialid):
-                    import re
-                    # 구분자 ':','.','_','-' 중 하나로 분리
-                    delimiters = r'[:._ -]'
-                    parts = re.split(delimiters, str(materialid))
-                    return parts[0] if parts else str(materialid)
+                # def get_materialid_prefix(materialid):
+                #     import re
+                #     # 구분자 ':','.','_','-' 중 하나로 분리
+                #     delimiters = r'[:._ -]'
+                #     parts = re.split(delimiters, str(materialid))
+                #     return parts[0] if parts else str(materialid)
                 
                 # 이전 행과 prefix가 다른 조건 추가
-                fab_df_temp_pos['materialid_prefix'] = fab_df_temp_pos['materialid'].apply(get_materialid_prefix)
-                fab_df_temp_pos['prev_materialid_prefix'] = fab_df_temp_pos['materialid_prefix'].shift(1)
+                # fab_df_temp_pos['materialid_prefix'] = fab_df_temp_pos['materialid'].apply(get_materialid_prefix)
+                # fab_df_temp_pos['prev_materialid_prefix'] = fab_df_temp_pos['materialid_prefix'].shift(1)
                 
                 # 기본 조건과 prefix 변경 조건을 결합
                 basic_condition = fab_df_temp_pos['materialid'] == material_id
-                prefix_change_condition = (fab_df_temp_pos['materialid_prefix'] != fab_df_temp_pos['prev_materialid_prefix']) | fab_df_temp_pos['prev_materialid_prefix'].isna()
+                # prefix_change_condition = (fab_df_temp_pos['materialid_prefix'] != fab_df_temp_pos['prev_materialid_prefix']) | fab_df_temp_pos['prev_materialid_prefix'].isna()
+
+                lot_id_condition = (fab_df_temp_pos['lotid'] == tkout.LOT_ID)
                 
-                match = fab_df_temp_pos[basic_condition & prefix_change_condition].index
+                match = fab_df_temp_pos[basic_condition & lot_id_condition].index
                 
                 if not match.empty:
                     cur_idx = match[0]
                     cur_start_time = fab_df_temp.loc[cur_idx, 'starttime_rev'].tz_localize(tz=None)
                     pre_end_time = None
 
-                    # 이전행이 없을때 바로 -1 리턴
-                    if cur_idx ==0:
+                    try:
+                        for offset in range(1, 9):
+                            prev_idx = cur_idx - offset
+                            if prev_idx < 0:
+                                result.append(-1)
+                                break
+                            prev_start_time = fab_df_temp.loc[prev_idx, 'starttime_rev'].tz_localize(tz=None)
+                            time_diff_sec = abs((cur_start_time - prev_start_time).total_seconds())
+                            if time_diff_sec > 1:
+                                pre_end_time = fab_df_temp.loc[prev_idx, 'endtime_rev'].tz_localize(tz=None)
+                                break
+                        if pre_end_time is not None:
+                            time_diff = (cur_start_time - pre_end_time).total_seconds()
+                            result.append(time_diff)        
+                    except Exception as e:
+                        logger.error(f"이전 wafer 찾을때 오류 발생함: {e}")
                         result.append(-1)
-                    else:    
-                        try:
-                            for offset in range(1, 9):
-                                prev_idx = cur_idx - offset
-                                if prev_idx < 0:
-                                    result.append(-1)
-                                    break
-                                prev_start_time = fab_df_temp.loc[prev_idx, 'starttime_rev'].tz_localize(tz=None)
-                                time_diff_sec = abs((cur_start_time - prev_start_time).total_seconds())
-                                if time_diff_sec > 1:
-                                    pre_end_time = fab_df_temp.loc[prev_idx, 'endtime_rev'].tz_localize(tz=None)
-                                    break
-                            if pre_end_time is not None:
-                                time_diff = (cur_start_time - pre_end_time).total_seconds()
-                                result.append(time_diff)        
-                        except Exception as e:
-                            logger.error(f"이전 wafer 찾을때 오류 발생함: {e}")
-                            result.append(-1)
             return result
 
         # 1. 전체 데이터로 계산
