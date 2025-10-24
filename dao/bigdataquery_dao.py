@@ -90,6 +90,23 @@ def get_eqp_hw_p_idle_history(line_name, eqp_id, lot_id, step_seq, start_date, e
     return eqp_hw_motion_history_df
 
 @bigdataquery_decorator
+def get_eqp_hw_p_idle_history_new(target_line, eqp_id, start_date, end_date, lot_id):
+    sql_query =(f"""
+                     select lotid, if_lot_id, equipmentid, moduleid, workgroup, state, recipename, stepname, starttime_rev, endtime_rev, materialid, if_step_seq
+                       from tab.m_fab_process
+                      where equipmetid = '{eqp_id}'
+                        and dateonly >= '{start_date} 00:00:00'
+                        and dateonly <= '{end_date} 00:00:00'
+                        and targetline = '{target_line}'
+                        and (if_lot_id = '{lot_id}' or lotid = '{lot_id}')    
+                  """)
+    param_dict = {"query": sql_query}
+    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata_sql'], param_dict, 60 * 10 * 2)
+    df =  pd.read_json(rc.get_result(), dtype={'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
+
+    return df
+
+@bigdataquery_decorator
 def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
     
     query_param = {'table_name': 'fab.m_fab_process',
@@ -110,35 +127,24 @@ def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, 
     
     return hw_process_hist_df
 
-# bigdataquery 방식을 sql방식대로 할려고 한다
-#site정보를 가져온후  site = vm_dao.get_site_info()
-#호출주소는
-#if site = 'MEM' 이면 http://127.0.0.1:8075/bigdataquery/getdataBySql
-#if site = 'FDRY' 이면 http://127.0.0.1:8076/bigdataquery/getdataBySql
-#파라미터: {"query": "sql쿼리문"}
-#{
-#    "query": "select distinct targetline from fab.m_mars_eqp_info where 1=1 and equipmentid = 'EAOEJ05'"
-#}
+# def get_targetline_by_site_and_eqp(site,eqp_id):
+#     if site == 'MEM':
+#         url = "http://127.0.0.1:8075/bigdataquery/getdataBySql"
+#     elif site == 'FDRY':
+#         url = "http://127.0.0.1:8076/bigdataquery/getdataBySql"
+#     else:
+#         raise ValueError(f"Unknown site: {site}")
 
-@bigdataquery_decorator
-def get_targetline_by_site_and_eqp(site,eqp_id):
-    if site == 'MEM':
-        url = "http://127.0.0.1:8075/bigdataquery/getdataBySql"
-    elif site == 'FDRY':
-        url = "http://127.0.0.1:8076/bigdataquery/getdataBySql"
-    else:
-        raise ValueError(f"Unknown site: {site}")
+#     sql_query = f"select distinct targetline from eqp_info where 1=1 and equipmentid = '{eqp_id}'"
+#     param_dict = {"query":sql_query}
+#     #rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
+#     rc = HttpRequestClient(url, param_dict, 60 * 10 * 2)
+#     df =  pd.read_json(rc.get_result())
 
-    sql_query = f"select distinct targetline from eqp_info where 1=1 and equipmentid = '{eqp_id}'"
-    param_dict = {"query":sql_query}
-    #rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
-    rc = HttpRequestClient(url, param_dict, 60 * 10 * 2)
-    df =  pd.read_json(rc.get_result())
-
-    if 'targetline' in df.columns and not df['targetline'].dropna().empty:
-        return df['targetline'].dropna().iloc[0]
-    else:
-        return None
+#     if 'targetline' in df.columns and not df['targetline'].dropna().empty:
+#         return df['targetline'].dropna().iloc[0]
+#     else:
+#         return None
 
 @bigdataquery_decorator
 def get_eqp_robot_motion_history_new(site, eqp_id, start_date, end_date):
@@ -151,6 +157,18 @@ def get_eqp_robot_motion_history_new(site, eqp_id, start_date, end_date):
     df =  pd.read_json(rc.get_result(), dtype={'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
 
     return df
+
+@bigdataquery_decorator
+def get_targetline_by_site_and_eqp(eqp_id):
+    sql_query = f"select distinct targetline from fab.m_mars_eqp_info where equipmentid = '{eqp_id}'"
+    param_dict = {"query":sql_query }
+    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata_sql'], param_dict, 60 * 10 * 2)
+    df =  pd.read_json(rc.get_result())
+
+    if 'targetline' in df.columns and not df['targetline'].dropna().empty:
+        return df['targetline'].dropna().iloc[0]
+    else:
+        return None
     
 @bigdataquery_decorator
 def get_fab_vm_data(table_name, line_id, device_id, step_seq, query_date):
