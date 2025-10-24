@@ -66,31 +66,31 @@ def get_eqp_hw_process_history(line_name, eqp_id, lot_id, step_seq, start_date, 
     eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     return eqp_hw_motion_history_df
 
-@bigdataquery_decorator
-def get_eqp_hw_p_idle_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
+# @bigdataquery_decorator
+# def get_eqp_hw_p_idle_history(line_name, eqp_id, lot_id, step_seq, start_date, end_date):
     
-    if line_name.startswith('P'):
-        line_name = 'P'
-    elif line_name.endswith('L'):
-        line_name = line_name.rstrip('L')
+#     if line_name.startswith('P'):
+#         line_name = 'P'
+#     elif line_name.endswith('L'):
+#         line_name = line_name.rstrip('L')
         
-    query_param = {'table_name': 'fab.m_fab_process',
-                   'eqp_id': eqp_id,
-                   'dateFrom': start_date,
-                   'dateTo': end_date,
-                   'like_conditions' : {'targetline' : f"%{line_name}%" }
-                  }
-    custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id', 'starttime_rev', 'endtime_rev','if_lot_id','if_step_seq']
+#     query_param = {'table_name': 'fab.m_fab_process',
+#                    'eqp_id': eqp_id,
+#                    'dateFrom': start_date,
+#                    'dateTo': end_date,
+#                    'like_conditions' : {'targetline' : f"%{line_name}%" }
+#                   }
+#     custom_columns = ['eqp_id', 'module_id', 'work_group', 'state', 'start_time', 'end_time', 'material_id', 'starttime_rev', 'endtime_rev','if_lot_id','if_step_seq']
     
-    param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
+#     param_dict = {'query_param': query_param, 'custom_columns': custom_columns}
     
-    rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
-    eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
+#     rc = HttpRequestClient(config.space_db_if_service['bigdataquery_getdata'], param_dict, 60 * 10 * 2)
+#     eqp_hw_motion_history_df = pd.read_json(rc.get_result(), dtype={'start_time': 'datetime64', 'end_time': 'datetime64' , 'starttime_rev': 'datetime64', 'endtime_rev': 'datetime64' })
     
-    return eqp_hw_motion_history_df
+#     return eqp_hw_motion_history_df
 
 @bigdataquery_decorator
-def get_eqp_hw_p_idle_history_new(target_line, eqp_id, start_date, end_date, lot_id):
+def get_eqp_hw_p_idle_history(target_line, eqp_id, start_date, end_date, lot_id):
     sql_query =(f"""
                      select lotid, if_lot_id, equipmentid, moduleid, workgroup, state, recipename, stepname, starttime_rev, endtime_rev, materialid, if_step_seq
                        from tab.m_fab_process
