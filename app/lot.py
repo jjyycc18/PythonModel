@@ -1,4 +1,7 @@
 import random
+import csv
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
 # 최근 10회 추첨 결과
 recent_draws = [
@@ -46,7 +49,11 @@ for num, count in freq.items():
     elif count == 2:
         result_last_10times[2].append(num)
     else:
-        result_last_10times[3].append(num)
+        result_last_10times[2].append(num)
+
+# dit print
+for keys,values in result_last_10times.items():
+    print(f" keys : {keys} => values : {values} ")
 
 def digit_group(num):
     """1의자리, 10의자리, 20의자리, 30의자리, 40의자리 그룹 반환"""
@@ -118,21 +125,61 @@ def make_except_nums():
 
 ###머신러닝""
 def read_recent_draws_from_csv(csv_filepath, last_n=10):
+    """lott.csv 파일에서 최근 last_n회 추첨 결과만을 리스트로 반환"""
     draws = []
-    with open(csv_filepath, encodng='utf-8') as f:
+    with open(csv_filepath, encoding='utf-8') as f:
         reader = csv.DictReader(f)
         rows = [row for row in reader if row['count'].isdigit()]
+        # count로 내림차순 정렬 (최신 회차가 맨 앞)
         rows.sort(key=lambda x: int(x['count']), reverse=True)
         for row in rows[:last_n]:
-            draw = [int(row[k]) for k in ['aa','bb','cc','dd','ee','ff'] if row[k].is disit()]
+            draw = [int(row[k]) for k in ['aa', 'bb', 'cc', 'dd', 'ee', 'ff'] if row[k].isdigit()]
             if len(draw) == 6:
                 draws.append(draw)
-    draws.reverse()
+    draws.reverse() # 최신 -> 오래된 순서로 변경
     return draws
-    
+
+def prepare_ml_data(draws, n_numbers=45):
+    X, y = [], []
+    for i in range(len(draws)-1):
+        x_row = [1 if num in draws[i] else 0 for num in range(1, n_numbers+1)]
+        y_row = [1 if num in draws[i+1] else 0 for num in range(1, n_numbers+1)]
+        X.append(x_row)
+        y.append(y_row)
+    return np.array(X), np.array(y)
+
+def predict_next_draw(draws, n_numbers=45, n_sets=3):
+    """랜덤포레스트로 다음 회차 번호 n_sets 세트 예측"""
+    if len(draws) < 3:
+        print("학습 데이터가 부족합니다.")
+        return []
+    X, y = prepare_ml_data(draws, n_numbers)
+    last_x = [1 if num in draws[-1] else 0 for num in range(1, n_numbers+1)]
+    preds = np.zeros(n_numbers)
+    for i in range(n_numbers):
+        clf = RandomForestClassifier(n_estimators=30, random_state=42)
+        clf.fit(X, y[:, i])
+        preds[i] = clf.predict_proba([last_x])[0][1]
+    # 여러 세트 추출을 위해 확률값 기반 랜덤 추출
+    sets = []
+    for _ in range(n_sets):
+        # 확률을 가중치로 6개 샘플링
+        candidate = list(np.random.choice(range(1, n_numbers+1), 6, replace=False, p=preds/preds.sum()))
+        candidate.sort()
+        sets.append(candidate)
+    return sets
+
+def predict_1194_from_csv(csv_path):
+    recent_draws = read_recent_draws_from_csv(csv_path, last_n=10)
+    sets = predict_next_draw(recent_draws, n_numbers=45, n_sets=3)
+    print("1194회 머신러닝 예측 3세트:")
+    for idx, nums in enumerate(sets, 1):
+        print(f"Set {idx}: {nums}")    
 
 if __name__ == "__main__":
+    #자동으로 제외수 만들기, 아님 수동으로할거면 주석처리
     meke_except_nums()
+    
     print("조건에 맞는 10세트 번호:")
     valid_sets = generate_sets(10)
     if valid_sets:
@@ -142,7 +189,3 @@ if __name__ == "__main__":
         print("조건을 만족하는 세트를 찾지 못했습니다.")
 
     predict_1194_from_csv('d:/lott.csv')
-
-# 이소스를 가지고 lott.csv 파일의 1000회 부터 1191회 까지 generate_sets(100) 를 호출하여 100set 중에 정답 3개이상을 맞춘 set가 몇개인지
-# 테스트 해줘, 출력형식은 다음과 같이 해줘 ( 1000회 정답율 : 3개정답율 3/100개 , 4개정답율 4/100, 5개정답율 5/100, 1등당첨 1/100 )  
-# 1000회의 정답은 이전 990회~999회의 자료를 바탕으로 generate_sets(100)을 한 후 1000회의 추첨결과로 산출한다, 1001회도 동일한 방법으로
