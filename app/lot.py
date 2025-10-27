@@ -105,7 +105,34 @@ def generate_sets(n_sets=10, max_try=5000):
                 sets.append(candidate)
     return sets
 
-def main():
+def make_except_nums():
+    grobal except_nums
+    except_nums =[]
+    pick_0 = random.sample(result_last_10times[0], 5)
+    pick_1 = random.sample(result_last_10times[1], 8)
+    pick_2 = random.sample(result_last_10times[2], 8)
+    except_nums = pick_0 + pick_1 + pick_2
+    except_nums.sort()
+    print(f"자동생성 제외수 : {except_nums}")
+    return except_nums
+
+###머신러닝""
+def read_recent_draws_from_csv(csv_filepath, last_n=10):
+    draws = []
+    with open(csv_filepath, encodng='utf-8') as f:
+        reader = csv.DictReader(f)
+        rows = [row for row in reader if row['count'].isdigit()]
+        rows.sort(key=lambda x: int(x['count']), reverse=True)
+        for row in rows[:last_n]:
+            draw = [int(row[k]) for k in ['aa','bb','cc','dd','ee','ff'] if row[k].is disit()]
+            if len(draw) == 6:
+                draws.append(draw)
+    draws.reverse()
+    return draws
+    
+
+if __name__ == "__main__":
+    meke_except_nums()
     print("조건에 맞는 10세트 번호:")
     valid_sets = generate_sets(10)
     if valid_sets:
@@ -114,8 +141,7 @@ def main():
     else:
         print("조건을 만족하는 세트를 찾지 못했습니다.")
 
-if __name__ == "__main__":
-    main()
+    predict_1194_from_csv('d:/lott.csv')
 
 # 이소스를 가지고 lott.csv 파일의 1000회 부터 1191회 까지 generate_sets(100) 를 호출하여 100set 중에 정답 3개이상을 맞춘 set가 몇개인지
 # 테스트 해줘, 출력형식은 다음과 같이 해줘 ( 1000회 정답율 : 3개정답율 3/100개 , 4개정답율 4/100, 5개정답율 5/100, 1등당첨 1/100 )  
