@@ -1,6 +1,7 @@
 import random
 import csv
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
 # 최근 10회 추첨 결과
@@ -175,6 +176,48 @@ def predict_1194_from_csv(csv_path):
     print("1194회 머신러닝 예측 3세트:")
     for idx, nums in enumerate(sets, 1):
         print(f"Set {idx}: {nums}")    
+def build_df_draw_result(csv_path):
+    # df = pd.read_csv(csv_path, dtype=str, encoding='utf-8')
+    # 에러행은 무시하라
+    df = pd.read_csv('d:/lott.csv', dtype=str, encoding='utf-8',
+                     engine='python', sep=',', quotechar='"',
+                     on_bad_lines='skip')  # 'warn'로 바꾸면 경고만 남김
+    if 'count' not in df.columns:
+        raise ValueError("CSV에 'count' 컬럼이 필요합니다.")
+
+    # 번호를 담고 있는 칼럼들을 추정 (기본적으로 aa..ff 사용)
+    candidate_num_cols = [c for c in ['aa', 'bb', 'cc', 'dd', 'ee', 'ff'] if c in df.columns]
+    if not candidate_num_cols:
+        # 'count' 제외한 모든 다른 컬럼을 번호 컬럼으로 간주
+        candidate_num_cols = [c for c in df.columns if c != 'count']
+
+    # count가 숫자인 행만 남김
+    df = df[df['count'].apply(lambda x: str(x).strip().isdigit())].copy()
+    df['count'] = df['count'].astype(int)
+    df = df.reset_index(drop=True)
+
+    # 결과 DataFrame 생성
+    cols = ['count'] + [f"{i:02d}" for i in range(1, 46)]
+    result = pd.DataFrame('', index=df.index, columns=cols)
+    result['count'] = df['count']
+
+    # 각 행마다 번호 칼럼의 값을 읽어 해당 칼럼에 'v' 표시
+    for idx, row in df.iterrows():
+        for c in candidate_num_cols:
+            v = row.get(c, '')
+            if pd.isna(v):
+                continue
+            s = str(v).strip()
+            if s.isdigit():
+                n = int(s)
+                if 1 <= n <= 45:
+                    result.at[idx, f"{n:02d}"] = 'v'
+
+    # (선택) count 기준으로 내림차순 정렬하려면 아래 주석 해제
+    # result = result.sort_values('count', ascending=False).reset_index(drop=True)
+
+    return result
+
 
 if __name__ == "__main__":
     #자동으로 제외수 만들기, 아님 수동으로할거면 주석처리
@@ -189,3 +232,7 @@ if __name__ == "__main__":
         print("조건을 만족하는 세트를 찾지 못했습니다.")
 
     predict_1194_from_csv('d:/lott.csv')
+    
+    # CSV로부터 df_draw_result 생성 (파일 경로를 실제 값으로 바꿔 사용하세요)
+    # df_draw = build_df_draw_result('d:/lott.csv')
+    # print(df_draw.head())
