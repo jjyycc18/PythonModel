@@ -129,7 +129,12 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
 def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_var, time_var):
     try:
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+
+        # target_line만 검사
+        if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
+            logger.error(f"Preprocessing failed (target_line is None or empty): (eqp_id={eqp_id}, lot_id={lot_id}, wafer_id={wafer_id}).")
+            return None
 
         # site 정보 10-15추가 1  
         site_name = vm_dao.get_site_info()
@@ -231,8 +236,13 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
 def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_var):
     try:
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
+        # target_line만 검사
+        if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
+            logger.error(f"Preprocessing failed (target_line is None or empty): (eqp_id={eqp_id}, lot_id={lot_id}, wafer_id={wafer_id}).")
+            return None
+            
         # 2. robot_motion_hist_df redis / 캐시에 조회
         cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
@@ -403,8 +413,13 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
 def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
     try:     
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
+        # target_line만 검사
+        if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
+            logger.error(f"Preprocessing failed (target_line is None or empty): (eqp_id={eqp_id}, lot_id={lot_id}, wafer_id={wafer_id}).")
+            return None
+          
         # 2. Redis key 생성
         cache_key = f"PRPC_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         process_hist_df = None
@@ -512,8 +527,13 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
 def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
     try:    
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
+        # target_line만 검사
+        if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
+            logger.error(f"Preprocessing failed (target_line is None or empty): (eqp_id={eqp_id}, lot_id={lot_id}, wafer_id={wafer_id}).")
+            return None
+          
         # 2. Redis key 생성
         cache_key = f"pp_idle|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         fab_df_origin = None
