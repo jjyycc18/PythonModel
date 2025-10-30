@@ -30,9 +30,9 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
     tkout = vm_dao.get_lot_tkout_info(lot_id, step_seq, eqp_id)
 
     # robot_motion, hw_motion 에서 사용하는 line_name 은 P1 과 같은 형태이므로 VM DB 에서 가져오는 LINE_NAME 에서 마지막 L 을 제거하고 사용
-    line_name = vm_dao.get_line_name(tkout.LINE_ID)
-    if line_name[-1] == 'L':
-        line_name = line_name[:-1]
+    # line_name = vm_dao.get_line_name(tkout.LINE_ID)
+    # if line_name[-1] == 'L':
+    #     line_name = line_name[:-1]
 
     # robot_motion, hw_motion 시간 조회 범위는 TKIN -1 ~ TKOUT +1
     start_date = (tkin.LOT_TRANSN_TMSTP + timedelta(days=-1)).strftime("%Y-%m-%d")
@@ -41,15 +41,15 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
     #target_line도 캐쉬에 넣는다
     cache_key = f"MARS_EQP_LINE|{eqp_id}"
     #mars_eqp_line_df, ttl = redis_cache.load_dataframe_from_fedis(cache_key)
-    mars_eqp_line_df, ttl = redis_cache.load_string_from_redis(cache_key)
+    mars_eqp_line, ttl = redis_cache.load_string_from_redis(cache_key)
 
-    if mars_eqp_line_df is None or ttl is None:
+    if mars_eqp_line is None or ttl is None:
         target_line = bigdataquery_dao.get_targetline_by_site_and_eqp(eqp_id)
         df = pd.DataFrame([[target_line]], columns=['targetline'])
         # redis_cache.save_dataframe_to_redis(cache_key,df)
         redis_cache.save_string_to_redis(cache_key, target_line)
     else:
-        target_line = mars_eqp_line_df.iloc[0,0]
+        target_line = mars_eqp_line
     
     return root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line
 
@@ -131,7 +131,7 @@ def apply_lot_mapping(hw_motion_hist_df, robot_motion_hist_df, carr_id, tkin_tim
 def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_var, time_var):
     try:
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
         # target_line만 검사
         if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
@@ -142,7 +142,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
         site_name = vm_dao.get_site_info()
 
         # 캐시에 조회
-        cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        cache_key = f"ROBOT_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
         
         # 2. Redis에서 데이터 조회
@@ -238,7 +238,7 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
 def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_var):
     try:
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
         # target_line만 검사
         if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
@@ -246,7 +246,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             return None
             
         # 2. robot_motion_hist_df redis / 캐시에 조회
-        cache_key = f"ROBOT_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        cache_key = f"ROBOT_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         robot_motion_hist_df = None
         
         # 3. Redis에서 데이터 조회
@@ -415,7 +415,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
 def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
     try:     
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
         # target_line만 검사
         if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
@@ -423,7 +423,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             return None
           
         # 2. Redis key 생성
-        cache_key = f"PRPC_MOTION|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        cache_key = f"PRPC_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         process_hist_df = None
         
         # 3. Redis에서 데이터 조회
@@ -529,7 +529,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
 def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
     try:    
         # 1. 전처리 작업
-        root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
+        root_lot_id, tkin, tkout, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
 
         # target_line만 검사
         if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
@@ -537,7 +537,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
             return None
           
         # 2. Redis key 생성
-        cache_key = f"pp_idle|{line_name}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        cache_key = f"pp_idle|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         fab_df_origin = None
         
         # 3. Redis에서 데이터 조회
