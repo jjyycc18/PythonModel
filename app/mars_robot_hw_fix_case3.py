@@ -40,12 +40,14 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
 
     #target_line도 캐쉬에 넣는다
     cache_key = f"MARS_EQP_LINE|{eqp_id}"
-    mars_eqp_line_df, ttl = redis_cache.load_dataframe_from_fedis(cache_key)
+    #mars_eqp_line_df, ttl = redis_cache.load_dataframe_from_fedis(cache_key)
+    mars_eqp_line_df, ttl = redis_cache.load_string_from_redis(cache_key)
 
     if mars_eqp_line_df is None or ttl is None:
         target_line = bigdataquery_dao.get_targetline_by_site_and_eqp(eqp_id)
         df = pd.DataFrame([[target_line]], columns=['targetline'])
-        redis_cache.save_dataframe_to_redis(cache_key,df)
+        # redis_cache.save_dataframe_to_redis(cache_key,df)
+        redis_cache.save_string_to_redis(cache_key, target_line)
     else:
         target_line = mars_eqp_line_df.iloc[0,0]
     
