@@ -8,20 +8,8 @@ import json
 import time
 
 logger = logging.getLogger(__name__)
-
 def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
-    """
-    공통 전처리 정보를 조회하는 함수
-    
-    Args:
-        step_seq (str): 스텝 시퀀스
-        eqp_id (str): 장비 ID
-        lot_id (str): 랏 ID
-        wafer_id (str): 웨이퍼 ID
-        
-    Returns:
-        tuple: (root_lot_id, tkin, tkout, line_name, start_date, end_date)
-    """
+
     # 현재 랏의 ROOT_LOT_ID 생성
     root_lot_id = app_common_function.generate_root_lot_id(lot_id)
 
@@ -51,7 +39,7 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
     else:
         target_line = mars_eqp_line
     
-    return root_lot_id, tkin, tkout, line_name, start_date, end_date, target_line
+    return root_lot_id, tkin, tkout, start_date, end_date, target_line
 
 def process_wafer_id(material_id):
     if ':' in material_id:
@@ -132,14 +120,6 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
     try:
         # 1. 전처리 작업
         root_lot_id, tkin, tkout, start_date, end_date, target_line = get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id)
-
-        # target_line만 검사
-        if target_line is None or (isinstance(target_line, str) and not target_line.strip()):
-            logger.error(f"Preprocessing failed (target_line is None or empty): (eqp_id={eqp_id}, lot_id={lot_id}, wafer_id={wafer_id}).")
-            return None
-
-        # site 정보 10-15추가 1  
-        site_name = vm_dao.get_site_info()
 
         # 캐시에 조회
         cache_key = f"ROBOT_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
@@ -290,7 +270,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         prev_state = ['PURGE_FRONT', 'PURGE_REAR', 'LPCHUCK']
 
         # 8. hw_motion_hist_df redis / 캐시에 조회
-        hw_cache_key = f"HW_MOTION|{line_name}|{eqp_id}|{src_module_id}|{work_var}|{start_date}|{end_date}"
+        hw_cache_key = f"HW_MOTION|{target_line}|{eqp_id}|{src_module_id}|{work_var}|{start_date}|{end_date}"
         hw_motion_hist_df = None
 
         # 8-1. Redis에서 데이터 조회
