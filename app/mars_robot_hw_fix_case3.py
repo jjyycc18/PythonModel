@@ -33,8 +33,11 @@ def get_preprocessing_info(step_seq, eqp_id, lot_id, wafer_id):
 
     if mars_eqp_line is None or ttl is None:
         target_line = bigdataquery_dao.get_targetline_by_site_and_eqp(eqp_id)
-        df = pd.DataFrame([[target_line]], columns=['targetline'])
-        # redis_cache.save_dataframe_to_redis(cache_key,df)
+        ########################################
+        if target_line is None or (isinstance(target_line, str) and target_line.strip() = =""):
+            logger.info(f" target_line {target_line} is NOne . Aborting preprocessing.")
+            raise RuntimeError(f" target_line {target_line} is NOne . Aborting preprocessing.")
+        ########################################
         redis_cache.save_string_to_redis(cache_key, target_line)
     else:
         target_line = mars_eqp_line
@@ -133,9 +136,12 @@ def mars_time_robot(step_seq, eqp_id, lot_id, wafer_id, src_var, dst_var, state_
             # 3. 캐시에 없으면 bigdata조회
             # robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(target_line, eqp_id, lot_id, step_seq, start_date, end_date)
             # 1015 수정
-            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history_new(target_line, eqp_id, start_date, end_date)
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history_new(target_line, eqp_id, start_date, end_date, lot_id)
 
             # 1015 여기에 robot_motion_hist_df is None 이면 끝내는 부분 필요
+            if robot_motion_hist_df is None:
+                logger.info("No data")
+                return None
             
             # 8월5일 추가분            
             robot_motion_hist_df = robot_motion_hist_df[ (robot_motion_hist_df['lotid'] == tkout.LOT_ID) | (robot_motion_hist_df['if_lot_id'] == tkout.LOT_ID)]
@@ -227,8 +233,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             
         # 2. robot_motion_hist_df redis / 캐시에 조회
         cache_key = f"ROBOT_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
-        robot_motion_hist_df = None
-        
+      
         # 3. Redis에서 데이터 조회
         robot_motion_hist_df, ttl = redis_cache.load_dataframe_from_redis(cache_key)
         
@@ -236,7 +241,8 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
             logger.info(f"No robot motion data in cache (key={cache_key})")
             
             # 4. 캐시에 없으면 bigdata조회
-            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(target_line, eqp_id, lot_id, step_seq, start_date, end_date)            
+            robot_motion_hist_df = bigdataquery_dao.get_eqp_robot_motion_history(target_line, eqp_id, lot_id, step_seq, start_date, end_date,lot_id)
+            
             robot_motion_hist_df['wafer_id'] = robot_motion_hist_df['materialid'].apply(process_wafer_id)            
             robot_motion_hist_df = robot_motion_hist_df.sort_values(by=['starttime_rev'])
             robot_motion_hist_df = robot_motion_hist_df.reset_index(drop=True)
@@ -264,6 +270,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
         ## src_module_id 와 dst_module_id 가 다르면 None 리턴
         if src_module_id != dst_module_id:
             logger.error('src_module_id not same as dst_module_id.')
+            return None
 
         ## 내 랏 READID 기준으로 나중에 오는 상태 값, 이전에 오는 상태 값 목록
         next_state = ['LPFORWARD', 'FOUPDOOROPEN', 'MAPPING', 'FOUPDOORCLOSE', 'LPDECHUCK']
@@ -289,7 +296,7 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
                 # 10.
                 redis_cache.save_dataframe_to_redis(hw_cache_key, hw_motion_hist_df)
                 # starttime 기준으로 정렬, 인덱스 초기화
-                hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['start_time'])
+                hw_motion_hist_df = hw_motion_hist_df.sort_values(by=['starttime_rev'])
                 hw_motion_hist_df = hw_motion_hist_df.reset_index(drop=True)                              
         else:
             logger.info(f"Found hw motion data in cache (key={hw_cache_key}, ttl={ttl})")
@@ -308,7 +315,9 @@ def mars_time_hw(step_seq, eqp_id, lot_id, wafer_id, work_var, state_var, time_v
 
             
             hw_motion_hist_df['wafer_id'] = hw_motion_hist_df['material_id'].apply(process_wafer_id)
-            filtered_hw_motion_hist_df = hw_motion_hist_df[((hw_motion_hist_df['wafer_id'] == wafer_id) | hw_motion_hist_df['wafer_id'] == int(wafer_id))  & (hw_motion_hist_df['state'] == state_var)]
+            lot_id_match_condition = hw_motion_hist_df['lot_id'].str.startswith(lot_id)
+            filtered_hw_motion_hist_df = hw_motion_hist_df[((hw_motion_hist_df['wafer_id'] == wafer_id) | hw_motion_hist_df['wafer_id'] == int(wafer_id))  
+                                & (hw_motion_hist_df['state'] == state_var) & lot_id_match_condition]
             
             
         ## 11.2. 설정된 state 로 material_id 가 없는 경우 (material_id = EMPTY) and # Case 3 매핑 적용 (모든 material_id가 'EMPTY'인 경우)
@@ -403,7 +412,7 @@ def mars_time_process(step_seq, eqp_id, lot_id, wafer_id, time_var):
             return None
           
         # 2. Redis key 생성
-        cache_key = f"PRPC_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
+        cache_key = f"PROC_MOTION|{target_line}|{eqp_id}|{lot_id}|{step_seq}|{start_date}|{end_date}"
         process_hist_df = None
         
         # 3. Redis에서 데이터 조회
@@ -606,29 +615,11 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
 
                 fab_df_temp_pos = fab_df_temp[(tkin_dt <= fab_df_temp['starttime_rev']) & (fab_df_temp['endtime_rev'] <= tkout_dt)]
                 
-                # 0924 기준위치     
-                # match를 구할때 아래 조건에서 and로 다음조건이 추가 되어야 한다. 
-                # fab_df_temp_pos['materialid'] 의 값에서 구분자 ':','.','_','-','.' 이것중 하나가 있다면
-                # 구분하여 앞에있는 값이 (ex: 'cb:1') 에서 text 'cb' 가  이전행의 값과 다른른행들을 모두 찾아야한다
-                
-                # materialid의 prefix를 추출하는 함수
-                # def get_materialid_prefix(materialid):
-                #     import re
-                #     # 구분자 ':','.','_','-' 중 하나로 분리
-                #     delimiters = r'[:._ -]'
-                #     parts = re.split(delimiters, str(materialid))
-                #     return parts[0] if parts else str(materialid)
-                
-                # 이전 행과 prefix가 다른 조건 추가
-                # fab_df_temp_pos['materialid_prefix'] = fab_df_temp_pos['materialid'].apply(get_materialid_prefix)
-                # fab_df_temp_pos['prev_materialid_prefix'] = fab_df_temp_pos['materialid_prefix'].shift(1)
-                
                 # 기본 조건과 prefix 변경 조건을 결합
                 basic_condition = fab_df_temp_pos['materialid'] == material_id
                 # prefix_change_condition = (fab_df_temp_pos['materialid_prefix'] != fab_df_temp_pos['prev_materialid_prefix']) | fab_df_temp_pos['prev_materialid_prefix'].isna()
 
-                lot_id_condition = (fab_df_temp_pos['lotid'] == tkout.LOT_ID)
-                
+                lot_id_condition = (fab_df_temp_pos['lotid'] == tkout.LOT_ID)                
                 match = fab_df_temp_pos[basic_condition & lot_id_condition].index
                 
                 if not match.empty:
