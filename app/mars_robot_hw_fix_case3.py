@@ -619,7 +619,7 @@ def mars_time_p_idle(step_seq, eqp_id, lot_id, wafer_id):
                 basic_condition = fab_df_temp_pos['materialid'] == material_id
                 # prefix_change_condition = (fab_df_temp_pos['materialid_prefix'] != fab_df_temp_pos['prev_materialid_prefix']) | fab_df_temp_pos['prev_materialid_prefix'].isna()
 
-                lot_id_condition = (fab_df_temp_pos['lotid'] == tkout.LOT_ID)                
+                lot_id_condition = ((fab_df_temp_pos['lotid'] == tkout.LOT_ID ) | (fab_df_temp_pos['if_lot_id'] == tkout.LOT_ID))              
                 match = fab_df_temp_pos[basic_condition & lot_id_condition].index
                 
                 if not match.empty:
