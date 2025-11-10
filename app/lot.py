@@ -22,7 +22,9 @@ recent_draws = [
 all_numbers = set(range(1, 46))
 
 # 제외할 숫자들 (전역 변수)
-except_nums = [1,2,3,4,5,6,7,8,9,10]
+# 아래 except_nums 를 lot_sub.py를 실행하여 생성된 sets = predict_next_draw() 값으로 넣어
+# 실행되도록 하고 싶다. 수정해줘
+except_nums = []
 
 # 각 번호별 출현 횟수 계산
 freq = {num: 0 for num in all_numbers}
